@@ -1,0 +1,21 @@
+{
+  "name": "HMS — Hospital Management System",
+  "short_name": "HMS",
+  "description": "Multi-tenant SaaS Hospital Management & Alert System",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b4f6c",
+  "theme_color": "#0b4f6c",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
