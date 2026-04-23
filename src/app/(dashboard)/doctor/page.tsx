@@ -1,4 +1,5 @@
-import { StubPage } from '@/components/shared/stub-page';
+import { RoleDashboardPage } from '@/components/shared/module-pages';
+
 export default function Page() {
-  return <StubPage title="Doctor Dashboard" module="Doctor" description="Role-specific workspace for Doctor" />;
+  return <RoleDashboardPage role="Doctor" />;
 }

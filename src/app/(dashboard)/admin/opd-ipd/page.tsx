@@ -1,4 +1,5 @@
-import { StubPage } from '@/components/shared/stub-page';
+import { OpdIpdModulePage } from '@/components/shared/module-pages';
+
 export default function Page() {
-  return <StubPage title="Opd Ipd" module="Opd Ipd" description="Admin · Opd Ipd module" />;
+  return <OpdIpdModulePage />;
 }

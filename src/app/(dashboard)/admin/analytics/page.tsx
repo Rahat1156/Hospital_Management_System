@@ -1,4 +1,5 @@
-import { StubPage } from '@/components/shared/stub-page';
+import { AnalyticsModulePage } from '@/components/shared/module-pages';
+
 export default function Page() {
-  return <StubPage title="Analytics" module="Analytics" description="Admin · Analytics module" />;
+  return <AnalyticsModulePage />;
 }

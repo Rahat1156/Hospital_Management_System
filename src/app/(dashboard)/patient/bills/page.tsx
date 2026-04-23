@@ -1,5 +1,5 @@
 import { BillingModulePage } from '@/components/shared/module-pages';
 
 export default function Page() {
-  return <BillingModulePage />;
+  return <BillingModulePage scope="Patient" />;
 }

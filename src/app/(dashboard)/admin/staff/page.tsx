@@ -1,4 +1,5 @@
-import { StubPage } from '@/components/shared/stub-page';
+import { StaffModulePage } from '@/components/shared/module-pages';
+
 export default function Page() {
-  return <StubPage title="Staff" module="Staff" description="Admin · Staff module" />;
+  return <StaffModulePage />;
 }

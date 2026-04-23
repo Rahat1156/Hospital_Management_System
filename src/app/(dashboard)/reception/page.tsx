@@ -1,4 +1,5 @@
-import { StubPage } from '@/components/shared/stub-page';
+import { RoleDashboardPage } from '@/components/shared/module-pages';
+
 export default function Page() {
-  return <StubPage title="Reception Dashboard" module="Reception" description="Role-specific workspace for Reception" />;
+  return <RoleDashboardPage role="Reception" />;
 }

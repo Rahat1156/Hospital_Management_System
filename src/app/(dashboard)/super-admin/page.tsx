@@ -1,4 +1,5 @@
-import { StubPage } from '@/components/shared/stub-page';
+import { RoleDashboardPage } from '@/components/shared/module-pages';
+
 export default function Page() {
-  return <StubPage title="Super Admin Dashboard" module="Super Admin" description="Role-specific workspace for Super Admin" />;
+  return <RoleDashboardPage role="Super Admin" />;
 }

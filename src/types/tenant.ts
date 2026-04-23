@@ -23,7 +23,7 @@ export interface PlanLimits {
   has_pharma_portal: boolean;
   has_white_label: boolean;
   has_ai_features: boolean;
-  alert_channels: Array<'sms' | 'email' | 'whatsapp' | 'voice' | 'api'>;
+  alert_channels: Array<'sms' | 'email' | 'whatsapp' | 'voice' | 'api' | 'in_app'>;
   sla_response_hours: number;
 }
 

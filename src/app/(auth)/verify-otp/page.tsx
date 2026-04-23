@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { Suspense, useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
@@ -9,6 +9,14 @@ import { authAPI } from '@/lib/mock-api';
 import { cn } from '@/lib/utils';
 
 export default function VerifyOtpPage() {
+  return (
+    <Suspense fallback={<div className="text-sm text-muted-foreground">Loading verification form...</div>}>
+      <VerifyOtpForm />
+    </Suspense>
+  );
+}
+
+function VerifyOtpForm() {
   const router = useRouter();
   const params = useSearchParams();
   const phone = params.get('phone') || '';
