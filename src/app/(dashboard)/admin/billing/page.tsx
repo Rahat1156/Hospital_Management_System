@@ -1,5 +1,5 @@
-import { BillingModulePage } from '@/components/shared/module-pages';
+import { HospitalAdminBillingPage } from '@/components/ops/ops-dashboards';
 
 export default function Page() {
-  return <BillingModulePage />;
+  return <HospitalAdminBillingPage />;
 }

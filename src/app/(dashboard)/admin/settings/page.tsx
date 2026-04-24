@@ -1,5 +1,5 @@
-import { SettingsModulePage } from '@/components/shared/module-pages';
+import { HospitalAdminSettingsPage } from '@/components/ops/ops-dashboards';
 
 export default function Page() {
-  return <SettingsModulePage />;
+  return <HospitalAdminSettingsPage />;
 }

@@ -1,5 +1,5 @@
-import { PrescriptionsModulePage } from '@/components/shared/module-pages';
+import { DoctorPrescriptionsPage } from '@/components/doctor/doctor-dashboard';
 
 export default function Page() {
-  return <PrescriptionsModulePage scope="Doctor" />;
+  return <DoctorPrescriptionsPage />;
 }

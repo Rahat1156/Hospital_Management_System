@@ -1,5 +1,5 @@
-import { RoleDashboardPage } from '@/components/shared/module-pages';
+import { ReceptionOverviewPage } from '@/components/ops/ops-dashboards';
 
 export default function Page() {
-  return <RoleDashboardPage role="Reception" />;
+  return <ReceptionOverviewPage />;
 }

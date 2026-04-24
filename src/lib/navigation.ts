@@ -22,34 +22,15 @@ export const navigationByRole: Record<UserRole, NavGroup[]> = {
   hospital_admin: [
     {
       items: [
-        { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
-        { label: 'HAS Alerts', href: '/admin/alerts', icon: AlertTriangle, badge: 3, highlight: true },
-      ],
-    },
-    {
-      label: 'Clinical',
-      items: [
+        { label: 'Overview', href: '/admin', icon: LayoutDashboard },
         { label: 'Patients', href: '/admin/patients', icon: Users },
         { label: 'Appointments', href: '/admin/appointments', icon: Calendar },
-        { label: 'Prescriptions', href: '/admin/prescriptions', icon: FileText },
-        { label: 'Lab Tests', href: '/admin/lab', icon: FlaskConical, badge: 18 },
-        { label: 'Pharmacy', href: '/admin/pharmacy', icon: Pill },
-        { label: 'Emergency', href: '/admin/emergency', icon: Ambulance },
-      ],
-    },
-    {
-      label: 'Operations',
-      items: [
-        { label: 'Beds & Wards', href: '/admin/beds', icon: Bed },
-        { label: 'OPD / IPD', href: '/admin/opd-ipd', icon: ClipboardList },
-        { label: 'Billing', href: '/admin/billing', icon: CreditCard },
-      ],
-    },
-    {
-      label: 'Management',
-      items: [
-        { label: 'Doctors & Staff', href: '/admin/staff', icon: UserCog },
-        { label: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
+        { label: 'Bed & Ward', href: '/admin/beds', icon: Bed },
+        { label: 'Alerts / HAS', href: '/admin/alerts', icon: AlertTriangle, badge: 3, highlight: true },
+        { label: 'Billing & Finance', href: '/admin/billing', icon: CreditCard },
+        { label: 'Staff Management', href: '/admin/staff', icon: UserCog },
+        { label: 'Doctor Performance', href: '/admin/doctor-performance', icon: Stethoscope },
+        { label: 'Analytics & Reports', href: '/admin/analytics', icon: BarChart3 },
         { label: 'Settings', href: '/admin/settings', icon: Settings },
       ],
     },
@@ -57,47 +38,68 @@ export const navigationByRole: Record<UserRole, NavGroup[]> = {
   doctor: [
     {
       items: [
-        { label: 'My Dashboard', href: '/doctor', icon: LayoutDashboard },
-        { label: 'Appointments', href: '/doctor/appointments', icon: Calendar, badge: 8 },
-        { label: 'Prescriptions', href: '/doctor/prescriptions', icon: FileText },
+        { label: 'Overview', href: '/doctor', icon: LayoutDashboard },
+        { label: 'Patient Queue', href: '/doctor/appointments', icon: Calendar, badge: 8 },
         { label: 'Patients', href: '/doctor/patients', icon: Users },
-        { label: 'Lab Orders', href: '/doctor/lab-orders', icon: FlaskConical },
+        { label: 'Schedule', href: '/doctor/schedule', icon: ClipboardList },
+        { label: 'Prescriptions', href: '/doctor/prescriptions', icon: FileText },
+        { label: 'Lab Results', href: '/doctor/lab-orders', icon: FlaskConical },
+        { label: 'Alerts', href: '/doctor/alerts', icon: AlertTriangle, badge: 3, highlight: true },
+        { label: 'Performance', href: '/doctor/performance', icon: BarChart3 },
       ],
     },
   ],
   nurse: [
     {
       items: [
-        { label: 'Dashboard', href: '/nurse', icon: LayoutDashboard },
-        { label: 'Vitals Entry', href: '/nurse/vitals', icon: HeartPulse },
-        { label: 'Ward View', href: '/nurse/ward', icon: Bed },
+        { label: 'Overview', href: '/nurse', icon: LayoutDashboard },
+        { label: 'Assigned Patients', href: '/nurse/patients', icon: Users },
+        { label: 'Care Chart', href: '/nurse/care-chart', icon: ClipboardList },
+        { label: 'Vitals', href: '/nurse/vitals', icon: HeartPulse, badge: 2 },
+        { label: 'Ward Status', href: '/nurse/ward', icon: Bed },
+        { label: 'Alerts', href: '/nurse/alerts', icon: AlertTriangle, badge: 2, highlight: true },
+        { label: 'History', href: '/nurse/history', icon: FileText },
       ],
     },
   ],
   lab_technician: [
     {
       items: [
-        { label: 'Dashboard', href: '/lab', icon: LayoutDashboard },
+        { label: 'Overview', href: '/lab', icon: LayoutDashboard },
         { label: 'Pending Tests', href: '/lab/pending', icon: FlaskConical, badge: 18 },
+        { label: 'Result Entry', href: '/lab/result-entry', icon: ClipboardList },
+        { label: 'Reports', href: '/lab/reports', icon: FileText },
+        { label: 'Critical Alerts', href: '/lab/critical-alerts', icon: AlertTriangle, badge: 2, highlight: true },
         { label: 'Reference Ranges', href: '/lab/reference-ranges', icon: ClipboardList },
+        { label: 'Patient Lookup', href: '/lab/patient-lookup', icon: Users },
       ],
     },
   ],
   pharmacist: [
     {
       items: [
-        { label: 'Dispensing Queue', href: '/pharmacy', icon: Pill, badge: 7 },
+        { label: 'Overview', href: '/pharmacy', icon: LayoutDashboard },
+        { label: 'Prescription Queue', href: '/pharmacy/prescription-queue', icon: Pill, badge: 7 },
+        { label: 'Dispensing', href: '/pharmacy/dispensing', icon: ClipboardList },
         { label: 'Inventory', href: '/pharmacy/inventory', icon: Package },
-        { label: 'Audit Log', href: '/pharmacy/audit', icon: ClipboardList },
+        { label: 'Low Stock Alerts', href: '/pharmacy/low-stock', icon: AlertTriangle, badge: 2, highlight: true },
+        { label: 'Expiry Tracking', href: '/pharmacy/expiry-tracking', icon: Calendar },
+        { label: 'Audit Logs', href: '/pharmacy/audit', icon: ClipboardList },
       ],
     },
   ],
   receptionist: [
     {
       items: [
-        { label: 'Today', href: '/reception', icon: LayoutDashboard },
+        { label: 'Overview', href: '/reception', icon: LayoutDashboard },
         { label: 'Register Patient', href: '/reception/register-patient', icon: Users },
         { label: 'Appointments', href: '/reception/appointments', icon: Calendar },
+        { label: 'Walk-ins', href: '/reception/walk-ins', icon: ClipboardList },
+        { label: 'OPD/IPD Flow', href: '/reception/opd-ipd', icon: Activity },
+        { label: 'Bed Assignment', href: '/reception/bed-assignment', icon: Bed },
+        { label: 'Billing', href: '/reception/billing', icon: CreditCard },
+        { label: 'Patient Search', href: '/reception/patient-search', icon: Users },
+        { label: 'Notifications', href: '/reception/notifications', icon: AlertTriangle, badge: 2 },
       ],
     },
   ],

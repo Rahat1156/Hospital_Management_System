@@ -1,5 +1,5 @@
-import { StaffModulePage } from '@/components/shared/module-pages';
+import { HospitalAdminStaffPage } from '@/components/ops/ops-dashboards';
 
 export default function Page() {
-  return <StaffModulePage />;
+  return <HospitalAdminStaffPage />;
 }

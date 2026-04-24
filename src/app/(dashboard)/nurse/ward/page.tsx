@@ -1,5 +1,5 @@
-import { BedsModulePage } from '@/components/shared/module-pages';
+import { NurseWardPage } from '@/components/nurse/nurse-dashboard';
 
 export default function Page() {
-  return <BedsModulePage />;
+  return <NurseWardPage />;
 }

@@ -1,5 +1,5 @@
-import { RoleDashboardPage } from '@/components/shared/module-pages';
+import { LabOverviewPage } from '@/components/ops/ops-dashboards';
 
 export default function Page() {
-  return <RoleDashboardPage role="Lab" />;
+  return <LabOverviewPage />;
 }
