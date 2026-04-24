@@ -23,6 +23,7 @@ export function Topbar({ onMobileMenuOpen }: TopbarProps) {
   if (!user) return null;
 
   const unreadCount = MOCK_NOTIFICATIONS.filter((n) => !n.is_read).length;
+  const alertsHref = user.role === 'patient' ? '/patient/notifications' : '/admin/alerts';
 
   async function handleLogout() {
     await authAPI.logout();
@@ -131,7 +132,7 @@ export function Topbar({ onMobileMenuOpen }: TopbarProps) {
                   ))}
                 </div>
                 <div className="border-t border-border px-4 py-2.5 text-center">
-                  <a href="/admin/alerts" className="text-xs font-medium text-primary hover:underline">
+                  <a href={alertsHref} className="text-xs font-medium text-primary hover:underline">
                     View all alerts
                   </a>
                 </div>

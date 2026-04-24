@@ -104,12 +104,14 @@ export const navigationByRole: Record<UserRole, NavGroup[]> = {
   patient: [
     {
       items: [
-        { label: 'My Health', href: '/patient', icon: Activity },
+        { label: 'Overview', href: '/patient', icon: Activity },
+        { label: 'My Profile', href: '/patient/profile', icon: Users },
         { label: 'Appointments', href: '/patient/appointments', icon: Calendar },
         { label: 'Prescriptions', href: '/patient/prescriptions', icon: FileText },
         { label: 'Lab Reports', href: '/patient/lab-reports', icon: FlaskConical },
-        { label: 'Bills', href: '/patient/bills', icon: CreditCard },
+        { label: 'Billing & Payments', href: '/patient/bills', icon: CreditCard },
         { label: 'Health Timeline', href: '/patient/timeline', icon: ClipboardList },
+        { label: 'Notifications', href: '/patient/notifications', icon: AlertTriangle, badge: 2 },
         { label: 'SOS Emergency', href: '/patient/sos', icon: LifeBuoy, highlight: true },
       ],
     },

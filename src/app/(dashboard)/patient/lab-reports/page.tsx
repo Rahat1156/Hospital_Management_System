@@ -1,5 +1,5 @@
-import { LabModulePage } from '@/components/shared/module-pages';
+import { PatientLabReportsPage } from '@/components/patient/patient-dashboard';
 
 export default function Page() {
-  return <LabModulePage scope="Patient" />;
+  return <PatientLabReportsPage />;
 }

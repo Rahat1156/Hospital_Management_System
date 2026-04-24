@@ -1,5 +1,5 @@
-import { EmergencyModulePage } from '@/components/shared/module-pages';
+import { PatientEmergencyPage } from '@/components/patient/patient-dashboard';
 
 export default function Page() {
-  return <EmergencyModulePage patientMode />;
+  return <PatientEmergencyPage />;
 }

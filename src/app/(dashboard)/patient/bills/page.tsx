@@ -1,5 +1,5 @@
-import { BillingModulePage } from '@/components/shared/module-pages';
+import { PatientBillingPage } from '@/components/patient/patient-dashboard';
 
 export default function Page() {
-  return <BillingModulePage scope="Patient" />;
+  return <PatientBillingPage />;
 }
