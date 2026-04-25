@@ -1,5 +1,5 @@
-import { LabModulePage } from '@/components/shared/module-pages';
+import { LabReferenceRangesPage } from '@/components/ops/ops-dashboards';
 
 export default function Page() {
-  return <LabModulePage scope="Lab" />;
+  return <LabReferenceRangesPage />;
 }

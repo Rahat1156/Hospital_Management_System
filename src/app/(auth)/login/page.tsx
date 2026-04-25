@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { authAPI } from '@/lib/mock-api';
 import { useAuthStore, roleDashboardPath } from '@/lib/auth-store';
 import { DEMO_CREDENTIALS } from '@/lib/mock-data';
+import { OpsRoleLoginChooser } from '@/components/ops/ops-dashboards';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -43,11 +44,13 @@ export default function LoginPage() {
     setShowDemo(false);
   }
 
+  const roleDemos = DEMO_CREDENTIALS;
+
   return (
     <div className="space-y-6 opacity-0 animate-fade-up">
       <div className="space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight text-foreground">Welcome back</h2>
-        <p className="text-sm text-muted-foreground">
+      <h2 className="text-3xl font-bold tracking-tight flex justify-center text-foreground"> Welcome To HMS</h2>
+        <p className="text-sm text-muted-foreground text-center">
           Sign in to your HMS account to continue.
         </p>
       </div>
@@ -126,17 +129,27 @@ export default function LoginPage() {
           />
         </button>
         {showDemo && (
-          <div className="mt-3 grid grid-cols-2 gap-1.5">
-            {DEMO_CREDENTIALS.map((c) => (
-              <button
-                key={c.email}
-                type="button"
-                onClick={() => fillDemo(c.email)}
-                className="rounded-md border border-border bg-background px-2.5 py-1.5 text-left text-xs hover:border-primary hover:bg-primary/5 transition-colors"
-              >
-                <div className="font-medium text-foreground">{c.role}</div>
-              </button>
-            ))}
+          <div
+            className="mt-3"
+            onClick={(e) => {
+              const target = (e.target as HTMLElement).closest('[data-demo-email]');
+              const demoEmail = target?.getAttribute('data-demo-email');
+              if (demoEmail) fillDemo(demoEmail);
+            }}
+          >
+            <OpsRoleLoginChooser />
+            {/* <div className="mt-3 grid grid-cols-2 gap-1.5">
+              {roleDemos.map((c) => (
+                <button
+                  key={c.email}
+                  type="button"
+                  onClick={() => fillDemo(c.email)}
+                  className="rounded-md border border-border bg-background px-2.5 py-1.5 text-left text-xs hover:border-primary hover:bg-primary/5 transition-colors"
+                >
+                  <div className="font-medium text-foreground">{c.role}</div>
+                </button>
+              ))}
+            </div> */}
           </div>
         )}
       </div>

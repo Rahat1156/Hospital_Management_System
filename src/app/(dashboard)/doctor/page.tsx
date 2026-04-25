@@ -1,5 +1,5 @@
-import { RoleDashboardPage } from '@/components/shared/module-pages';
+import { DoctorOverviewPage } from '@/components/doctor/doctor-dashboard';
 
 export default function Page() {
-  return <RoleDashboardPage role="Doctor" />;
+  return <DoctorOverviewPage />;
 }

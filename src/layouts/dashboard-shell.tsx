@@ -37,7 +37,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Main area */}
-      <div className={cn('flex min-w-0 flex-1 flex-col')}>
+      <div className={cn('flex min-w-0 flex-1 flex-col overflow-x-hidden')}>
         <Topbar onMobileMenuOpen={() => setMobileOpen(true)} />
         <main className="flex-1 p-4 lg:p-6">{children}</main>
       </div>

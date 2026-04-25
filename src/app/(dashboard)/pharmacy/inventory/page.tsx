@@ -1,5 +1,5 @@
-import { PharmacyModulePage } from '@/components/shared/module-pages';
+import { PharmacyInventoryPage } from '@/components/ops/ops-dashboards';
 
 export default function Page() {
-  return <PharmacyModulePage />;
+  return <PharmacyInventoryPage />;
 }

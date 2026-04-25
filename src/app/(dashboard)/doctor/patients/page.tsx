@@ -1,5 +1,5 @@
-import PatientListPage from '@/app/(dashboard)/admin/patients/page';
+import { DoctorPatientsPage } from '@/components/doctor/doctor-dashboard';
 
 export default function Page() {
-  return <PatientListPage />;
+  return <DoctorPatientsPage />;
 }

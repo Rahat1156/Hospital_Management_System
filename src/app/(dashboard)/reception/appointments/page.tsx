@@ -1,5 +1,5 @@
-import { AppointmentsModulePage } from '@/components/shared/module-pages';
+import { ReceptionAppointmentsPage } from '@/components/ops/ops-dashboards';
 
 export default function Page() {
-  return <AppointmentsModulePage scope="Reception" />;
+  return <ReceptionAppointmentsPage />;
 }
