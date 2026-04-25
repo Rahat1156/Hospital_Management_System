@@ -1,5 +1,5 @@
-import { HospitalAdminAppointmentsPage } from '@/components/ops/ops-dashboards';
+import { AppointmentsModulePage } from '@/components/shared/module-pages';
 
 export default function Page() {
-  return <HospitalAdminAppointmentsPage />;
+  return <AppointmentsModulePage />;
 }

@@ -1,5 +1,5 @@
-import { PharmacyOverviewPage } from '@/components/ops/ops-dashboards';
+import { RoleDashboardPage } from '@/components/shared/module-pages';
 
 export default function Page() {
-  return <PharmacyOverviewPage />;
+  return <RoleDashboardPage role="Pharmacy" />;
 }

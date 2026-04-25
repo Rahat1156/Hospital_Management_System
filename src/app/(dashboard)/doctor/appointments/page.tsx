@@ -1,5 +1,5 @@
-import { DoctorAppointmentsPage } from '@/components/doctor/doctor-dashboard';
+import { AppointmentsModulePage } from '@/components/shared/module-pages';
 
 export default function Page() {
-  return <DoctorAppointmentsPage />;
+  return <AppointmentsModulePage scope="Doctor" />;
 }

@@ -1,5 +1,5 @@
-import { DoctorLabResultsPage } from '@/components/doctor/doctor-dashboard';
+import { LabModulePage } from '@/components/shared/module-pages';
 
 export default function Page() {
-  return <DoctorLabResultsPage />;
+  return <LabModulePage />;
 }

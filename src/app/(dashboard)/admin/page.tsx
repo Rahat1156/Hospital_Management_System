@@ -1,5 +1,10 @@
-import { HospitalAdminOverviewPage } from '@/components/ops/ops-dashboards';
+import { AnalyticsModulePage, RoleDashboardPage } from '@/components/shared/module-pages';
 
 export default function Page() {
-  return <HospitalAdminOverviewPage />;
+  return (
+    <div className="space-y-6">
+      <RoleDashboardPage role="Reception" />
+      <AnalyticsModulePage />
+    </div>
+  );
 }

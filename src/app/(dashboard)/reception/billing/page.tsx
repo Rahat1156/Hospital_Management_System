@@ -1,5 +1,5 @@
-import { ReceptionBillingPage } from '@/components/ops/ops-dashboards';
+import { BillingModulePage } from '@/components/shared/module-pages';
 
 export default function Page() {
-  return <ReceptionBillingPage />;
+  return <BillingModulePage scope="Reception" />;
 }

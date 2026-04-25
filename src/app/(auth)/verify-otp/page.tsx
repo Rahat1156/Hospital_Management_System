@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { authAPI } from '@/lib/mock-api';
+import { authAPI } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 export default function VerifyOtpPage() {

@@ -1,5 +1,5 @@
-import { ReceptionBedAssignmentPage } from '@/components/ops/ops-dashboards';
+import { BedsModulePage } from '@/components/shared/module-pages';
 
 export default function Page() {
-  return <ReceptionBedAssignmentPage />;
+  return <BedsModulePage />;
 }

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Copy, ShieldCheck, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { authAPI } from '@/lib/mock-api';
+import { authAPI } from '@/lib/api';
 
 export default function TwoFactorPage() {
   const [setup, setSetup] = useState<{ secret: string; qr_code_url: string; backup_codes: string[] } | null>(null);

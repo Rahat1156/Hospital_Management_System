@@ -1,5 +1,5 @@
-import { ReceptionOpdIpdPage } from '@/components/ops/ops-dashboards';
+import { OpdIpdModulePage } from '@/components/shared/module-pages';
 
 export default function Page() {
-  return <ReceptionOpdIpdPage />;
+  return <OpdIpdModulePage />;
 }

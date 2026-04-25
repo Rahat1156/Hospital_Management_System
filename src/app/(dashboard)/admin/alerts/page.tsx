@@ -1,5 +1,5 @@
-import { HospitalAdminAlertsPage } from '@/components/ops/ops-dashboards';
+import { EmergencyModulePage } from '@/components/shared/module-pages';
 
 export default function Page() {
-  return <HospitalAdminAlertsPage />;
+  return <EmergencyModulePage />;
 }

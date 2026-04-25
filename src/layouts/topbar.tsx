@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { Bell, LogOut, Menu, Search, Settings, User as UserIcon, X } from 'lucide-react';
 import { useAuthStore } from '@/lib/auth-store';
-import { authAPI } from '@/lib/mock-api';
+import { authAPI } from '@/lib/api';
 import { MOCK_NOTIFICATIONS } from '@/lib/mock-data';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';

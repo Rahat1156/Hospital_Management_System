@@ -1,5 +1,5 @@
-import { ReceptionPatientSearchPage } from '@/components/ops/ops-dashboards';
+import { PatientsModulePage } from '@/components/shared/module-pages';
 
 export default function Page() {
-  return <ReceptionPatientSearchPage />;
+  return <PatientsModulePage />;
 }

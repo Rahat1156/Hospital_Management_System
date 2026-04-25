@@ -39,6 +39,7 @@ import {
   bedAPI,
   billingAPI,
   dashboardAPI,
+  erdAPI,
   emergencyAPI,
   labAPI,
   patientAPI,
@@ -46,7 +47,8 @@ import {
   prescriptionAPI,
   tenantAPI,
   userAPI,
-} from '@/lib/mock-api';
+} from '@/lib/api';
+import { useAuthStore } from '@/lib/auth-store';
 import { cn, formatBDT, formatDate, formatDateTime, formatPhone, formatRelative, formatTime } from '@/lib/utils';
 import type {
   Alert,
@@ -93,6 +95,47 @@ function ProgressBar({ value, critical }: { value: number; critical?: boolean })
   return (
     <div className="h-2 overflow-hidden rounded-full bg-secondary">
       <div className={cn('h-full rounded-full bg-primary', critical && 'bg-critical')} style={{ width: `${Math.min(value, 100)}%` }} />
+    </div>
+  );
+}
+
+export function PatientsModulePage() {
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [query, setQuery] = useState('');
+  const loadPatients = () => patientAPI.list().then((r) => setPatients(r.data));
+  useEffect(() => {
+    loadPatients();
+  }, []);
+  const filtered = patients.filter((patient) => `${patient.full_name} ${patient.mrn} ${patient.phone.number} ${patient.email ?? ''}`.toLowerCase().includes(query.toLowerCase()));
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Patients" description="Backend patient registry collected from signed-in users and staff." actions={<Input placeholder="Search patients..." value={query} onChange={(e) => setQuery(e.target.value)} className="h-9 w-64" />} />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <MiniMetric icon={Users} label="Registered patients" value={patients.length} />
+        <MiniMetric icon={ClipboardList} label="With MRN" value={patients.filter((patient) => patient.mrn).length} tone="accent" />
+        <MiniMetric icon={CreditCard} label="Outstanding" value={formatBDT(patients.reduce((sum, patient) => sum + (patient.outstanding_balance_bdt ?? 0), 0))} tone="borderline" />
+      </div>
+      <SectionCard title="Patient Directory" description={`${filtered.length} records from PostgreSQL`}>
+        <TableShell>
+          <table className="w-full text-sm">
+            <thead className="border-b border-border bg-secondary/30 text-left text-xs uppercase text-muted-foreground">
+              <tr><th className="px-5 py-3">MRN</th><th className="px-3 py-3">Name</th><th className="px-3 py-3">Phone</th><th className="px-3 py-3">Blood</th><th className="px-3 py-3">Gender</th></tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {filtered.map((patient) => (
+                <tr key={patient.id} className="hover:bg-secondary/30">
+                  <td className="px-5 py-3 font-mono text-xs">{patient.mrn}</td>
+                  <td className="px-3 py-3 font-medium">{patient.full_name}</td>
+                  <td className="px-3 py-3">{formatPhone(patient.phone)}</td>
+                  <td className="px-3 py-3">{patient.blood_group ?? '-'}</td>
+                  <td className="px-3 py-3 capitalize">{patient.gender}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableShell>
+      </SectionCard>
     </div>
   );
 }
@@ -498,12 +541,21 @@ export function RoleDashboardPage({ role }: { role: 'Doctor' | 'Nurse' | 'Lab' |
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [labTests, setLabTests] = useState<LabTest[]>([]);
+  const [inventory, setInventory] = useState<MedicineInventory[]>([]);
   const [tenant, setTenant] = useState<Tenant | null>(null);
-  useEffect(() => {
+  const loadDashboardData = () => {
     appointmentAPI.list().then((r) => setAppointments(r.data));
     alertAPI.getActive().then((r) => setAlerts(r.data));
     patientAPI.list().then((r) => setPatients(r.data));
+    userAPI.list().then((r) => setUsers(r.data));
+    labAPI.list().then((r) => setLabTests(r.data));
+    pharmacyAPI.listInventory().then((r) => setInventory(r.data));
     tenantAPI.getCurrent().then((r) => setTenant(r.data));
+  };
+  useEffect(() => {
+    loadDashboardData();
   }, []);
 
   if (role === 'Patient') {
@@ -537,13 +589,14 @@ export function RoleDashboardPage({ role }: { role: 'Doctor' | 'Nurse' | 'Lab' |
     <div className="space-y-6">
       <PageHeader title={`${role} Dashboard`} description={`${config[role].primary}, alerts, and today's operational priorities.`} actions={<Button asChild><Link href={config[role].href}>Open Workspace</Link></Button>} />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MiniMetric icon={CfgIcon} label={config[role].primary} value={role === 'Lab' ? 18 : role === 'Pharmacy' ? 7 : appointments.length} />
+        <MiniMetric icon={CfgIcon} label={config[role].primary} value={role === 'Lab' ? labTests.length : role === 'Pharmacy' ? inventory.filter((item) => item.is_low_stock || item.is_out_of_stock).length : appointments.length} />
         <MiniMetric icon={Calendar} label="Appointments" value={appointments.length} tone="accent" />
         <MiniMetric icon={Users} label="Patients" value={patients.length} tone="healthy" />
         <MiniMetric icon={AlertTriangle} label="Active alerts" value={alerts.length} tone="critical" />
       </div>
+      <DashboardDataEntryPanel tenant={tenant} patients={patients} users={users} role={role} onCreated={loadDashboardData} />
       <div className="grid gap-6 lg:grid-cols-2">
-        <SectionCard title="Today at a Glance" description="Work queue generated from mock API">
+        <SectionCard title="Today at a Glance" description="Work queue generated from backend data">
           <div className="divide-y divide-border">{appointments.map((a) => <div key={a.id} className="flex items-center justify-between gap-3 p-4"><div><div className="font-medium">{a.patient_name}</div><div className="text-xs text-muted-foreground">{formatTime(a.scheduled_at)} · {a.reason}</div></div><Badge variant={statusVariant(a.status)}>{label(a.status)}</Badge></div>)}</div>
         </SectionCard>
         <SectionCard title="Priority Alerts" description="Unacknowledged work requiring attention">
@@ -554,15 +607,203 @@ export function RoleDashboardPage({ role }: { role: 'Doctor' | 'Nurse' | 'Lab' |
   );
 }
 
+function DashboardDataEntryPanel({
+  tenant,
+  patients,
+  users,
+  role,
+  onCreated,
+}: {
+  tenant: Tenant | null;
+  patients: Patient[];
+  users: User[];
+  role: 'Doctor' | 'Nurse' | 'Lab' | 'Pharmacy' | 'Reception';
+  onCreated: () => void;
+}) {
+  const [patientName, setPatientName] = useState('');
+  const [patientPhone, setPatientPhone] = useState('');
+  const [patientEmail, setPatientEmail] = useState('');
+  const [appointmentAt, setAppointmentAt] = useState('');
+  const [testType, setTestType] = useState('');
+  const [billAmount, setBillAmount] = useState('');
+  const [medicineName, setMedicineName] = useState('');
+  const [stock, setStock] = useState('');
+  const [wardName, setWardName] = useState('');
+  const [bedNumber, setBedNumber] = useState('');
+  const [saving, setSaving] = useState('');
+  const [message, setMessage] = useState('');
+
+  const tenantId = Number(tenant?.id ?? 1);
+  const firstPatient = patients[0];
+  const firstDoctor = users.find((user) => user.role === 'doctor') ?? users[0];
+  const firstLabTech = users.find((user) => user.role === 'lab_technician') ?? firstDoctor;
+
+  async function savePatient() {
+    if (!patientName.trim()) return;
+    setSaving('patient');
+    await erdAPI.create('patients', {
+      tenant_id: tenantId,
+      mrn: `HMS-${Date.now().toString().slice(-6)}`,
+      name: patientName,
+      phone: patientPhone,
+      email: patientEmail,
+      gender: 'other',
+    });
+    setPatientName('');
+    setPatientPhone('');
+    setPatientEmail('');
+    setMessage('Patient saved from dashboard input.');
+    setSaving('');
+    onCreated();
+  }
+
+  async function saveAppointment() {
+    if (!firstPatient || !firstDoctor || !appointmentAt) return;
+    setSaving('appointment');
+    await erdAPI.create('appointments', {
+      tenant_id: tenantId,
+      patient_id: Number(firstPatient.id),
+      doctor_id: Number(firstDoctor.id),
+      slot_datetime: appointmentAt,
+      status: 'scheduled',
+    });
+    setAppointmentAt('');
+    setMessage('Appointment created from dashboard input.');
+    setSaving('');
+    onCreated();
+  }
+
+  async function saveLabTest() {
+    if (!firstPatient || !testType.trim()) return;
+    setSaving('lab');
+    await erdAPI.create('lab-tests', {
+      patient_id: Number(firstPatient.id),
+      technician_id: firstLabTech ? Number(firstLabTech.id) : null,
+      test_type: testType,
+    });
+    setTestType('');
+    setMessage('Lab test saved from dashboard input.');
+    setSaving('');
+    onCreated();
+  }
+
+  async function saveBill() {
+    if (!firstPatient || !billAmount) return;
+    setSaving('bill');
+    const bill = await erdAPI.create<{ bill_id: number }>('bills', {
+      tenant_id: tenantId,
+      patient_id: Number(firstPatient.id),
+      total: Number(billAmount),
+      status: 'pending',
+    });
+    await erdAPI.create('bill-items', {
+      bill_id: bill.data.bill_id,
+      description: 'Dashboard charge',
+      amount: Number(billAmount),
+    });
+    setBillAmount('');
+    setMessage('Bill saved from dashboard input.');
+    setSaving('');
+    onCreated();
+  }
+
+  async function saveMedicine() {
+    if (!medicineName.trim()) return;
+    setSaving('medicine');
+    const medicine = await erdAPI.create<{ medicine_id: number }>('medicines', {
+      name: medicineName,
+      generic_name: medicineName,
+      stock: Number(stock || 0),
+    });
+    await erdAPI.create('inventory', {
+      medicine_id: medicine.data.medicine_id,
+      quantity: Number(stock || 0),
+      expiry_date: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+    });
+    setMedicineName('');
+    setStock('');
+    setMessage('Medicine and inventory saved from dashboard input.');
+    setSaving('');
+    onCreated();
+  }
+
+  async function saveWardBed() {
+    if (!wardName.trim() || !bedNumber.trim()) return;
+    setSaving('bed');
+    const ward = await erdAPI.create<{ ward_id: number }>('wards', {
+      tenant_id: tenantId,
+      name: wardName,
+    });
+    await erdAPI.create('beds', {
+      ward_id: ward.data.ward_id,
+      bed_number: bedNumber,
+      status: 'available',
+    });
+    setWardName('');
+    setBedNumber('');
+    setMessage('Ward and bed saved from dashboard input.');
+    setSaving('');
+    onCreated();
+  }
+
+  return (
+    <SectionCard title="Collect Data" description={`Signed-in ${role.toLowerCase()} users can enter new backend records here.`}>
+      <div className="grid gap-4 p-5 lg:grid-cols-3">
+        <QuickForm title="Patient">
+          <Input placeholder="Patient name" value={patientName} onChange={(e) => setPatientName(e.target.value)} />
+          <Input placeholder="Phone" value={patientPhone} onChange={(e) => setPatientPhone(e.target.value)} />
+          <Input placeholder="Email" value={patientEmail} onChange={(e) => setPatientEmail(e.target.value)} />
+          <Button onClick={savePatient} loading={saving === 'patient'}>Save Patient</Button>
+        </QuickForm>
+        <QuickForm title="Appointment / Lab">
+          <Input type="datetime-local" value={appointmentAt} onChange={(e) => setAppointmentAt(e.target.value)} />
+          <Button onClick={saveAppointment} loading={saving === 'appointment'} disabled={!firstPatient || !firstDoctor}>Create Appointment</Button>
+          <Input placeholder="Lab test type" value={testType} onChange={(e) => setTestType(e.target.value)} />
+          <Button variant="outline" onClick={saveLabTest} loading={saving === 'lab'} disabled={!firstPatient}>Order Lab Test</Button>
+        </QuickForm>
+        <QuickForm title="Billing / Stock / Bed">
+          <Input type="number" placeholder="Bill amount" value={billAmount} onChange={(e) => setBillAmount(e.target.value)} />
+          <Button onClick={saveBill} loading={saving === 'bill'} disabled={!firstPatient}>Create Bill</Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Input placeholder="Medicine" value={medicineName} onChange={(e) => setMedicineName(e.target.value)} />
+            <Input type="number" placeholder="Stock" value={stock} onChange={(e) => setStock(e.target.value)} />
+          </div>
+          <Button variant="outline" onClick={saveMedicine} loading={saving === 'medicine'}>Add Stock</Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Input placeholder="Ward" value={wardName} onChange={(e) => setWardName(e.target.value)} />
+            <Input placeholder="Bed no." value={bedNumber} onChange={(e) => setBedNumber(e.target.value)} />
+          </div>
+          <Button variant="outline" onClick={saveWardBed} loading={saving === 'bed'}>Add Bed</Button>
+        </QuickForm>
+      </div>
+      {message && <div className="border-t border-border px-5 py-3 text-sm text-healthy">{message}</div>}
+    </SectionCard>
+  );
+}
+
+function QuickForm({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-3 rounded-lg border border-border p-4">
+      <div className="text-sm font-semibold">{title}</div>
+      {children}
+    </div>
+  );
+}
+
 function PatientDashboard() {
   const [timeline, setTimeline] = useState<Array<{ id: string; title: string; description?: string; event_date: string; event_type: string }>>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
+  const user = useAuthStore((state) => state.user);
   useEffect(() => {
-    patientAPI.getHealthTimeline('patient-001').then((r) => setTimeline(r.data));
-    appointmentAPI.list({ patient_id: 'patient-001' }).then((r) => setAppointments(r.data));
-    billingAPI.list({ patient_id: 'patient-001' }).then((r) => setBills(r.data));
-  }, []);
+    patientAPI.list().then((patientResponse) => {
+      const currentPatient = patientResponse.data.find((patient) => patient.email === user?.email) ?? patientResponse.data[0];
+      if (!currentPatient) return;
+      patientAPI.getHealthTimeline(currentPatient.id).then((r) => setTimeline(r.data));
+      appointmentAPI.list({ patient_id: currentPatient.id }).then((r) => setAppointments(r.data));
+      billingAPI.list({ patient_id: currentPatient.id }).then((r) => setBills(r.data));
+    });
+  }, [user?.email]);
   return (
     <div className="space-y-6">
       <PageHeader title="My Health" description="Appointments, prescriptions, reports, bills, and emergency access." actions={<Button asChild variant="destructive"><Link href="/patient/sos">SOS Emergency</Link></Button>} />

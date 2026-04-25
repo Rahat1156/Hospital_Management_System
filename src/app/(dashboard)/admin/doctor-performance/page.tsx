@@ -1,5 +1,5 @@
-import { HospitalAdminDoctorPerformancePage } from '@/components/ops/ops-dashboards';
+import { AnalyticsModulePage } from '@/components/shared/module-pages';
 
 export default function Page() {
-  return <HospitalAdminDoctorPerformancePage />;
+  return <AnalyticsModulePage />;
 }
