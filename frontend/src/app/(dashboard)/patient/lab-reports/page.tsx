@@ -1,13 +1,64 @@
-import { FlaskConical } from 'lucide-react';
+'use client';
+
+import { Download, Eye, FlaskConical } from 'lucide-react';
 import { PageHeader, SectionCard, KPICard } from '@/components/shared';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { downloadDocument, viewDocument } from '@/lib/document-utils';
 import { MOCK_LAB_TESTS } from '@/lib/mock-data';
 import { formatDateTime } from '@/lib/utils';
+import type { LabTest } from '@/types';
 
 const patientId = 'patient-001';
 
 export default function PatientLabReportsPage() {
   const reports = MOCK_LAB_TESTS.filter((test) => test.patient_id === patientId);
+
+  function toResultLines(report: LabTest): string {
+    if (!report.results || report.results.length === 0) {
+      return 'No test parameters entered.';
+    }
+
+    return report.results
+      .map((result, index) => (
+        `${index + 1}. ${result.parameter_name}: ${result.value} ${result.unit} (${result.flag})`
+      ))
+      .join('\n');
+  }
+
+  function viewReportDocument(report: LabTest) {
+    viewDocument({
+      title: `Lab Report ${report.test_number}`,
+      fileName: `lab-report-${report.test_number}`,
+      fields: [
+        { label: 'Report Number', value: report.test_number },
+        { label: 'Patient', value: `${report.patient_name} (${report.patient_mrn})` },
+        { label: 'Test Name', value: report.test_name },
+        { label: 'Doctor', value: report.ordered_by_doctor_name },
+        { label: 'Ordered At', value: formatDateTime(report.ordered_at) },
+        { label: 'Status', value: report.status.replace(/_/g, ' ') },
+        { label: 'Overall Flag', value: report.overall_flag },
+        { label: 'Results', value: toResultLines(report) },
+      ],
+    });
+  }
+
+  function downloadReportDocument(report: LabTest) {
+    downloadDocument({
+      title: `Lab Report ${report.test_number}`,
+      fileName: `lab-report-${report.test_number}`,
+      fields: [
+        { label: 'Report Number', value: report.test_number },
+        { label: 'Patient', value: `${report.patient_name} (${report.patient_mrn})` },
+        { label: 'Test Name', value: report.test_name },
+        { label: 'Doctor', value: report.ordered_by_doctor_name },
+        { label: 'Ordered At', value: formatDateTime(report.ordered_at) },
+        { label: 'Status', value: report.status.replace(/_/g, ' ') },
+        { label: 'Overall Flag', value: report.overall_flag },
+        { label: 'Results', value: toResultLines(report) },
+      ],
+    });
+  }
 
   return (
     <div className="space-y-6">
@@ -34,6 +85,12 @@ export default function PatientLabReportsPage() {
                     {report.overall_flag}
                   </Badge>
                   <Badge variant={report.status === 'reported' ? 'healthy' : 'accent'} className="capitalize">{report.status.replace(/_/g, ' ')}</Badge>
+                  <Button type="button" size="sm" variant="outline" onClick={() => viewReportDocument(report)}>
+                    <Eye className="h-4 w-4" /> View
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => downloadReportDocument(report)}>
+                    <Download className="h-4 w-4" /> Download
+                  </Button>
                 </div>
               </div>
               {report.results && (

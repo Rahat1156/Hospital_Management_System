@@ -115,6 +115,11 @@ export function Topbar({ onMobileMenuOpen }: TopbarProps) {
     router.push('/profile');
   }
 
+  function goToEditProfile() {
+    setProfileOpen(false);
+    router.push('/profile?section=edit');
+  }
+
   function goToSettings() {
     setProfileOpen(false);
     router.push(settingsHref);
@@ -139,14 +144,14 @@ export function Topbar({ onMobileMenuOpen }: TopbarProps) {
 
       {/* Search */}
       <div className="hidden min-w-0 flex-1 max-w-2xl lg:block">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <div className="flex h-9 items-center gap-2 rounded-md border border-input bg-secondary/50 px-3 text-sm transition-colors focus-within:border-primary focus-within:bg-background focus-within:ring-2 focus-within:ring-ring/30">
+          <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
           <input
             type="search"
             placeholder="Search patients, MRN, appointments..."
-            className="h-9 w-full rounded-md border border-input bg-secondary/50 pl-9 pr-4 text-sm placeholder:text-muted-foreground focus:border-primary focus:bg-background focus:outline-none focus:ring-2 focus:ring-ring/30 transition-colors"
+            className="h-full w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
           />
-          <kbd className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-background px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground xl:inline-block">
+          <kbd className="hidden shrink-0 rounded border border-border bg-background px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground xl:inline-block">
             Ctrl K
           </kbd>
         </div>
@@ -173,7 +178,7 @@ export function Topbar({ onMobileMenuOpen }: TopbarProps) {
           >
             <Bell className="h-[18px] w-[18px]" />
             {unreadCount > 0 && (
-              <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+              <span className="absolute right-0 top-0 z-10 flex h-4 min-w-4 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground ring-2 ring-background">
                 {unreadCount}
               </span>
             )}
@@ -304,6 +309,13 @@ export function Topbar({ onMobileMenuOpen }: TopbarProps) {
                     className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-secondary"
                   >
                     <UserIcon className="h-4 w-4" /> Profile
+                  </button>
+                  <button
+                    onClick={goToEditProfile}
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-secondary"
+                  >
+                    <UserIcon className="h-4 w-4" /> Edit profile
                   </button>
                   <button
                     onClick={goToSettings}
