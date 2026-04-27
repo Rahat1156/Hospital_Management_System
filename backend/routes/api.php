@@ -33,6 +33,7 @@ Route::get('/patients/{id}/health-timeline', [HmsApiController::class, 'patientT
 Route::get('/appointments', [HmsApiController::class, 'listAppointments']);
 Route::get('/appointments/today', [HmsApiController::class, 'getTodayAppointments']);
 Route::get('/appointments/{id}', [HmsApiController::class, 'getAppointment']);
+Route::post('/appointments', [HmsApiController::class, 'createAppointment']);
 
 Route::get('/prescriptions', [HmsApiController::class, 'listPrescriptions']);
 Route::get('/prescriptions/{id}', [HmsApiController::class, 'getPrescription']);
@@ -53,10 +54,12 @@ Route::get('/bills/{id}', [HmsApiController::class, 'getBill']);
 Route::get('/alerts', [HmsApiController::class, 'listAlerts']);
 Route::get('/alerts/active', [HmsApiController::class, 'activeAlerts']);
 Route::get('/alerts/notifications', [HmsApiController::class, 'notifications']);
+Route::post('/alerts/notifications/{id}/read', [HmsApiController::class, 'markNotificationRead']);
 Route::post('/alerts/{id}/acknowledge', [HmsApiController::class, 'acknowledgeAlert']);
 
 Route::get('/emergencies/active', [HmsApiController::class, 'activeEmergencies']);
 Route::post('/emergencies/trigger-sos', [HmsApiController::class, 'triggerSos']);
 
 Route::get('/users', [HmsApiController::class, 'listUsers']);
+Route::put('/users/{id}/profile', [HmsApiController::class, 'updateUserProfile']);
 Route::get('/users/doctors', [HmsApiController::class, 'listDoctors']);

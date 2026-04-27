@@ -7,9 +7,10 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
@@ -438,6 +439,87 @@ class HmsApiController extends Controller
         return $row ? $this->ok($this->mapAppointment($row)) : $this->error('Appointment not found', Response::HTTP_NOT_FOUND);
     }
 
+    public function createAppointment(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'patient_id' => ['required', 'string'],
+            'doctor_id' => ['required', 'string'],
+            'appointment_type' => ['required', 'in:consultation,follow_up,teleconsultation,procedure,emergency'],
+            'scheduled_at' => ['required', 'date'],
+            'duration_minutes' => ['nullable', 'integer', 'min:5', 'max:240'],
+            'reason' => ['required', 'string', 'max:1500'],
+            'notes' => ['nullable', 'string', 'max:3000'],
+        ]);
+
+        $resolvedPatientId = $this->resolvePatientId((string) $data['patient_id']);
+        $patient = DB::table('patients')->where('id', $resolvedPatientId)->first();
+        if (! $patient) {
+            return $this->error('Patient not found', Response::HTTP_NOT_FOUND);
+        }
+
+        $doctor = DB::table('users')
+            ->where('id', (string) $data['doctor_id'])
+            ->where('role', 'doctor')
+            ->first();
+        if (! $doctor) {
+            return $this->error('Doctor not found', Response::HTTP_NOT_FOUND);
+        }
+
+        $id = 'appt-'.Str::uuid();
+        $appointmentNumber = $this->generateAppointmentNumber();
+        $scheduledAt = Carbon::parse($data['scheduled_at']);
+        $duration = (int) ($data['duration_minutes'] ?? 30);
+        $tenantId = $patient->tenant_id ?: ($doctor->tenant_id ?: (DB::table('tenants')->value('id') ?? 'tenant-001'));
+        $createdAt = now();
+
+        DB::transaction(function () use ($id, $appointmentNumber, $resolvedPatientId, $patient, $doctor, $data, $scheduledAt, $duration, $tenantId, $createdAt): void {
+            DB::table('appointments')->insert([
+                'id' => $id,
+                'tenant_id' => $tenantId,
+                'appointment_number' => $appointmentNumber,
+                'patient_id' => $resolvedPatientId,
+                'doctor_id' => $doctor->id,
+                'department' => null,
+                'appointment_type' => $data['appointment_type'],
+                'status' => 'scheduled',
+                'source' => 'online_patient',
+                'scheduled_at' => $scheduledAt,
+                'duration_minutes' => $duration,
+                'reason' => trim((string) $data['reason']),
+                'notes' => isset($data['notes']) ? trim((string) $data['notes']) : null,
+                'fee_bdt' => 0,
+                'payment_status' => 'pending',
+                'reminder_24h_sent' => false,
+                'reminder_2h_sent' => false,
+                'created_at' => $createdAt,
+                'updated_at' => $createdAt,
+            ]);
+
+            DB::table('notifications')->insert([
+                'id' => 'notif-'.Str::uuid(),
+                'alert_id' => null,
+                'user_id' => $doctor->id,
+                'title' => 'New appointment booked',
+                'message' => "{$patient->full_name} booked {$data['appointment_type']} on {$scheduledAt->format('M d, Y h:i A')}.",
+                'severity' => 'info',
+                'is_read' => false,
+                'read_at' => null,
+                'action_url' => '/doctor/appointments?appointment_id='.$id,
+                'created_at' => $createdAt,
+                'updated_at' => $createdAt,
+            ]);
+        });
+
+        $row = DB::table('appointments as a')
+            ->leftJoin('patients as p', 'p.id', '=', 'a.patient_id')
+            ->leftJoin('users as d', 'd.id', '=', 'a.doctor_id')
+            ->select('a.*', 'p.mrn as patient_mrn', 'p.full_name as patient_name', 'p.phone_country_code', 'p.phone_number', 'd.full_name as doctor_name', 'd.doctor_profile')
+            ->where('a.id', $id)
+            ->first();
+
+        return $this->ok($this->mapAppointment($row), 'Appointment created');
+    }
+
     public function listPrescriptions(Request $request): JsonResponse
     {
         $query = DB::table('prescriptions as pr')
@@ -734,9 +816,22 @@ class HmsApiController extends Controller
         return $this->ok($rows);
     }
 
-    public function notifications(): JsonResponse
+    public function notifications(Request $request): JsonResponse
     {
-        $rows = DB::table('notifications')
+        $data = $request->validate([
+            'user_id' => ['nullable', 'string'],
+            'unread_only' => ['nullable', 'boolean'],
+        ]);
+
+        $query = DB::table('notifications');
+        if (! empty($data['user_id'])) {
+            $query->where('user_id', (string) $data['user_id']);
+        }
+        if (! empty($data['unread_only'])) {
+            $query->where('is_read', false);
+        }
+
+        $rows = $query
             ->orderByDesc('created_at')
             ->get()
             ->map(fn ($row) => [
@@ -753,6 +848,41 @@ class HmsApiController extends Controller
             ])
             ->values();
         return $this->ok($rows);
+    }
+
+    public function markNotificationRead(Request $request, string $id): JsonResponse
+    {
+        $data = $request->validate([
+            'user_id' => ['required', 'string'],
+        ]);
+
+        $updated = DB::table('notifications')
+            ->where('id', $id)
+            ->where('user_id', (string) $data['user_id'])
+            ->update([
+                'is_read' => true,
+                'read_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+        if (! $updated) {
+            return $this->error('Notification not found', Response::HTTP_NOT_FOUND);
+        }
+
+        $row = DB::table('notifications')->where('id', $id)->first();
+
+        return $this->ok([
+            'id' => $row->id,
+            'alert_id' => $row->alert_id,
+            'user_id' => $row->user_id ? (string) $row->user_id : null,
+            'title' => $row->title,
+            'message' => $row->message,
+            'severity' => $row->severity,
+            'is_read' => (bool) $row->is_read,
+            'read_at' => $this->iso($row->read_at),
+            'action_url' => $row->action_url,
+            'created_at' => $this->iso($row->created_at),
+        ], 'Notification marked as read');
     }
 
     public function acknowledgeAlert(string $id): JsonResponse
@@ -807,6 +937,72 @@ class HmsApiController extends Controller
             ->map(fn ($user) => $this->mapUser($user))
             ->values();
         return $this->ok($rows);
+    }
+
+    public function updateUserProfile(Request $request, string $id): JsonResponse
+    {
+        /** @var User|null $user */
+        $user = User::query()->find($id);
+        if (! $user) {
+            return $this->error('User not found', Response::HTTP_NOT_FOUND);
+        }
+
+        $data = $request->validate([
+            'full_name' => ['nullable', 'string', 'max:255'],
+            'phone_country_code' => ['nullable', 'string', 'max:8'],
+            'phone_number' => ['nullable', 'string', 'max:20'],
+            'profile_photo_url' => ['nullable', 'string', 'max:2048'],
+            'profile_photo_data' => ['nullable', 'string'],
+        ]);
+
+        $updates = [];
+
+        if (array_key_exists('full_name', $data)) {
+            $fullName = trim((string) $data['full_name']);
+            if ($fullName === '') {
+                return $this->error('Full name is required', Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+            $updates['full_name'] = $fullName;
+            $updates['name'] = $fullName;
+        }
+
+        if (array_key_exists('phone_country_code', $data)) {
+            $updates['phone_country_code'] = trim((string) $data['phone_country_code']);
+        }
+        if (array_key_exists('phone_number', $data)) {
+            $updates['phone_number'] = trim((string) $data['phone_number']);
+        }
+
+        $profilePhotoUrl = array_key_exists('profile_photo_url', $data)
+            ? trim((string) ($data['profile_photo_url'] ?? ''))
+            : null;
+
+        if (! empty($data['profile_photo_data'])) {
+            try {
+                $profilePhotoUrl = $this->persistProfilePhotoDataUrl($request, (string) $data['profile_photo_data'], (string) $user->id);
+            } catch (\RuntimeException $e) {
+                return $this->error($e->getMessage(), $e->getCode() > 0 ? $e->getCode() : Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+        }
+
+        if (array_key_exists('profile_photo_url', $data) || ! empty($data['profile_photo_data'])) {
+            $updates['profile_photo_url'] = $profilePhotoUrl !== '' ? $profilePhotoUrl : null;
+        }
+
+        if (count($updates) === 0) {
+            return $this->ok($this->mapUser($user), 'No profile changes provided');
+        }
+
+        $updates['updated_at'] = now();
+        DB::table('users')->where('id', $user->id)->update($updates);
+
+        /** @var User|null $freshUser */
+        $freshUser = User::query()->find($user->id);
+        if (! $freshUser) {
+            return $this->error('User not found after update', Response::HTTP_NOT_FOUND);
+        }
+
+        return $this->ok($this->mapUser($freshUser), 'Profile updated successfully');
     }
 
     public function listDoctors(): JsonResponse
@@ -1137,6 +1333,20 @@ class HmsApiController extends Controller
         return 'HAX-'.str_pad((string) ($max + 1), 5, '0', STR_PAD_LEFT);
     }
 
+    private function generateAppointmentNumber(): string
+    {
+        $year = now()->format('Y');
+        for ($attempt = 0; $attempt < 20; $attempt++) {
+            $candidate = 'APT-'.$year.'-'.str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT);
+            $exists = DB::table('appointments')->where('appointment_number', $candidate)->exists();
+            if (! $exists) {
+                return $candidate;
+            }
+        }
+
+        return 'APT-'.$year.'-'.str_pad((string) (DB::table('appointments')->count() + 1), 4, '0', STR_PAD_LEFT);
+    }
+
     private function decodeJson(mixed $value): mixed
     {
         if ($value === null || $value === '') {
@@ -1164,6 +1374,48 @@ class HmsApiController extends Controller
     {
         $row = DB::table('tenants')->where('id', $tenantId)->first();
         return $row ? $this->mapTenant($row) : null;
+    }
+
+    private function persistProfilePhotoDataUrl(Request $request, string $dataUrl, string $userId): string
+    {
+        if (! preg_match('/^data:image\/([a-zA-Z0-9\+\-]+);base64,(.*)$/', $dataUrl, $matches)) {
+            throw new \RuntimeException('Invalid profile photo data.', Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $rawBase64 = str_replace(' ', '+', $matches[2]);
+        $binary = base64_decode($rawBase64, true);
+        if ($binary === false) {
+            throw new \RuntimeException('Invalid profile photo encoding.', Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $maxSizeBytes = 2 * 1024 * 1024;
+        if (strlen($binary) > $maxSizeBytes) {
+            throw new \RuntimeException('Profile photo must be 2MB or less.', Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $subtype = strtolower($matches[1]);
+        $extensionMap = [
+            'jpeg' => 'jpg',
+            'jpg' => 'jpg',
+            'png' => 'png',
+            'webp' => 'webp',
+            'gif' => 'gif',
+        ];
+
+        if (! isset($extensionMap[$subtype])) {
+            throw new \RuntimeException('Unsupported profile photo format.', Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $extension = $extensionMap[$subtype];
+        $directory = public_path('uploads/profile-photos');
+        if (! File::exists($directory)) {
+            File::makeDirectory($directory, 0755, true);
+        }
+
+        $fileName = 'user-'.$userId.'-'.now()->format('YmdHis').'-'.Str::lower(Str::random(8)).'.'.$extension;
+        File::put($directory.DIRECTORY_SEPARATOR.$fileName, $binary);
+
+        return rtrim($request->getSchemeAndHttpHost(), '/').'/uploads/profile-photos/'.$fileName;
     }
 
     private function ok(mixed $data, ?string $message = null): JsonResponse
