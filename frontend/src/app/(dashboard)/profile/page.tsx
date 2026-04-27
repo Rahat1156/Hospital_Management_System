@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -16,6 +17,8 @@ import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { PageHeader, SectionCard } from '@/components/shared';
 import { useAuthStore, roleDashboardPath } from '@/lib/auth-store';
 import { roleLabels } from '@/lib/navigation';
@@ -23,24 +26,213 @@ import { formatDate } from '@/lib/utils';
 
 export default function ProfilePage() {
   const searchParams = useSearchParams();
-  const { user, tenant } = useAuthStore();
+  const { user, tenant, updateUser } = useAuthStore();
   const section = searchParams.get('section');
+  const isEditMode = section === 'edit';
 
   if (!user) return null;
 
   const roleProfile = getRoleProfile(user);
+  const [fullName, setFullName] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [phoneCode, setPhoneCode] = useState('+880');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState('');
+  const [saveMessage, setSaveMessage] = useState('');
+  const [saveOk, setSaveOk] = useState(true);
+
+  useEffect(() => {
+    setFullName(user.full_name ?? '');
+    setDisplayName(user.display_name ?? '');
+    setPhoneCode(user.phone?.country_code ?? '+880');
+    setPhoneNumber(user.phone?.number ?? '');
+    setProfilePhotoUrl(user.profile_photo_url ?? '');
+  }, [user]);
+
+  function handleProfileUpdate(event: React.FormEvent) {
+    event.preventDefault();
+
+    if (!fullName.trim()) {
+      setSaveOk(false);
+      setSaveMessage('Full name is required.');
+      return;
+    }
+
+    if (!phoneCode.trim() || !phoneNumber.trim()) {
+      setSaveOk(false);
+      setSaveMessage('Phone country code and number are required.');
+      return;
+    }
+
+    updateUser({
+      full_name: fullName.trim(),
+      display_name: displayName.trim() || undefined,
+      phone: {
+        country_code: phoneCode.trim(),
+        number: phoneNumber.trim(),
+      },
+      profile_photo_url: profilePhotoUrl.trim() || undefined,
+    });
+
+    setSaveOk(true);
+    setSaveMessage('Profile updated successfully.');
+  }
+
+  function handlePhotoFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setSaveOk(false);
+      setSaveMessage('Please select an image file.');
+      event.target.value = '';
+      return;
+    }
+
+    const maxSizeBytes = 2 * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+      setSaveOk(false);
+      setSaveMessage('Image size must be 2MB or less.');
+      event.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const value = typeof reader.result === 'string' ? reader.result : '';
+      if (!value) {
+        setSaveOk(false);
+        setSaveMessage('Failed to read selected image. Please try again.');
+        return;
+      }
+
+      setProfilePhotoUrl(value);
+      setSaveOk(true);
+      setSaveMessage('Photo selected. Click Update profile to save changes.');
+    };
+    reader.onerror = () => {
+      setSaveOk(false);
+      setSaveMessage('Failed to read selected image. Please try again.');
+    };
+    reader.readAsDataURL(file);
+  }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={section === 'settings' ? 'Profile Settings' : 'My Profile'}
-        description="Your account, role, contact and security information"
+        title={isEditMode ? 'Edit Profile' : section === 'settings' ? 'Profile Settings' : 'My Profile'}
+        description={
+          isEditMode
+            ? 'Update your account details and save changes'
+            : 'Your account, role, contact and security information'
+        }
         actions={
           <Button asChild variant="outline" size="sm">
             <Link href={roleDashboardPath(user.role)}>Back to dashboard</Link>
           </Button>
         }
       />
+
+      {isEditMode && (
+        <SectionCard title="Edit & Update Profile" description="Change profile details used across the HMS workspace">
+          <form onSubmit={handleProfileUpdate} className="space-y-4 p-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="full_name">Full name</Label>
+                <Input
+                  id="full_name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Enter full name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="display_name">Display name</Label>
+                <Input
+                  id="display_name"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="Enter display name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="profile_photo_url">Profile photo URL</Label>
+                <Input
+                  id="profile_photo_url"
+                  value={profilePhotoUrl}
+                  onChange={(e) => setProfilePhotoUrl(e.target.value)}
+                  placeholder="https://..."
+                />
+              </div>
+
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="profile_photo_file">Profile picture from device</Label>
+                <div className="flex flex-col gap-3 rounded-lg border border-border bg-secondary/30 p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <Avatar src={profilePhotoUrl || undefined} name={fullName || user.full_name} size="md" />
+                    <p className="text-xs text-muted-foreground">
+                      Select JPG, PNG, or WEBP. Max size 2MB.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="profile_photo_file"
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoFileChange}
+                      className="block w-full text-xs text-muted-foreground file:mr-2 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-primary-foreground hover:file:bg-primary/90 sm:w-auto"
+                    />
+                    {profilePhotoUrl && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setProfilePhotoUrl('')}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="phone_code">Phone country code</Label>
+                <Input
+                  id="phone_code"
+                  value={phoneCode}
+                  onChange={(e) => setPhoneCode(e.target.value)}
+                  placeholder="+880"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="phone_number">Phone number</Label>
+                <Input
+                  id="phone_number"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="1712345678"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
+              <Button type="submit" size="sm">Update profile</Button>
+              <Button type="button" variant="outline" size="sm" asChild>
+                <Link href="/profile">Cancel</Link>
+              </Button>
+              {saveMessage && (
+                <span className={saveOk ? 'text-sm text-healthy' : 'text-sm text-destructive'}>
+                  {saveMessage}
+                </span>
+              )}
+            </div>
+          </form>
+        </SectionCard>
+      )}
 
       <Card className="overflow-hidden">
         <div className="bg-auth-gradient p-5 text-white sm:p-6">

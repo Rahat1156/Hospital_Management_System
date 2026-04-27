@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { BrandLink } from '@/components/shared/brand-mark';
 import { authAPI } from '@/lib/mock-api';
-import { useAuthStore } from '@/lib/auth-store';
+import { roleDashboardPath, useAuthStore } from '@/lib/auth-store';
 import { DEMO_CREDENTIALS } from '@/lib/mock-data';
 
 export default function LoginPage() {
@@ -29,7 +29,7 @@ export default function LoginPage() {
     try {
       const res = await authAPI.login({ email, password });
       setSession(res.data);
-      router.replace('/');
+      router.replace(roleDashboardPath(res.data.user.role));
     } catch (err) {
       const msg = err instanceof Error ? err.message : (err as { message?: string })?.message;
       setError(msg || 'Login failed. Please try again.');
