@@ -24,15 +24,20 @@ Route::prefix('dashboard')->group(function () {
     Route::get('/doctor-performance', [HmsApiController::class, 'doctorPerformance']);
 });
 
+Route::post('/patients', [HmsApiController::class, 'registerWalkIn']);
 Route::get('/patients', [HmsApiController::class, 'listPatients']);
 Route::get('/patients/search', [HmsApiController::class, 'listPatients']);
 Route::get('/patients/mrn/{mrn}', [HmsApiController::class, 'getPatientByMrn']);
 Route::get('/patients/{id}', [HmsApiController::class, 'getPatient']);
 Route::get('/patients/{id}/health-timeline', [HmsApiController::class, 'patientTimeline']);
 
+Route::post('/appointments', [HmsApiController::class, 'createAppointment']);
 Route::get('/appointments', [HmsApiController::class, 'listAppointments']);
 Route::get('/appointments/today', [HmsApiController::class, 'getTodayAppointments']);
 Route::get('/appointments/{id}', [HmsApiController::class, 'getAppointment']);
+Route::post('/appointments/{id}/payment-intent', [HmsApiController::class, 'appointmentPaymentIntent']);
+Route::post('/appointments/{id}/mark-paid', [HmsApiController::class, 'markAppointmentPaid']);
+Route::post('/appointments/{id}/pay-direct', [HmsApiController::class, 'appointmentPayDirect']);
 
 Route::get('/prescriptions', [HmsApiController::class, 'listPrescriptions']);
 Route::get('/prescriptions/{id}', [HmsApiController::class, 'getPrescription']);
@@ -49,6 +54,9 @@ Route::get('/beds', [HmsApiController::class, 'listBeds']);
 
 Route::get('/bills', [HmsApiController::class, 'listBills']);
 Route::get('/bills/{id}', [HmsApiController::class, 'getBill']);
+Route::post('/billing/{id}/payment-intent', [HmsApiController::class, 'createPaymentIntent']);
+Route::post('/billing/{id}/mark-paid', [HmsApiController::class, 'markBillPaid']);
+Route::post('/billing/{id}/pay-direct', [HmsApiController::class, 'billPayDirect']);
 
 Route::get('/alerts', [HmsApiController::class, 'listAlerts']);
 Route::get('/alerts/active', [HmsApiController::class, 'activeAlerts']);

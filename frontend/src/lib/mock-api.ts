@@ -112,6 +112,33 @@ export const dashboardAPI = {
   },
 };
 
+export interface WalkInPatientPayload {
+  full_name: string;
+  father_name?: string;
+  mother_name?: string;
+  phone_country_code: string;
+  phone_number: string;
+  date_of_birth: string;
+  gender: string;
+  marital_status?: string;
+  religion?: string;
+  occupation?: string;
+  nid_number?: string;
+  birth_certificate_number?: string;
+  blood_group?: string;
+  email?: string;
+  address_line1?: string;
+  address_city?: string;
+  address_district?: string;
+  address_division?: string;
+  address_postal_code?: string;
+  emergency_contact_name?: string;
+  emergency_contact_relation?: string;
+  emergency_contact_phone?: string;
+  allergies?: string;
+  chronic_conditions?: string;
+}
+
 export const patientAPI = {
   list(): Promise<ApiResponse<Patient[]>> {
     return request('/patients');
@@ -128,17 +155,58 @@ export const patientAPI = {
   search(query: string): Promise<ApiResponse<Patient[]>> {
     return request(withQuery('/patients/search', { q: query }));
   },
+  registerWalkIn(payload: WalkInPatientPayload): Promise<ApiResponse<Patient>> {
+    return request('/patients', { method: 'POST', body: JSON.stringify(payload) });
+  },
 };
 
 export const appointmentAPI = {
   list(filters?: { doctor_id?: string; patient_id?: string; status?: string }): Promise<ApiResponse<Appointment[]>> {
     return request(withQuery('/appointments', filters));
   },
+  create(payload: {
+    patient_id: string;
+    doctor_id: string;
+    appointment_type: string;
+    scheduled_at: string;
+    reason: string;
+    duration_minutes?: number;
+  }): Promise<ApiResponse<Appointment>> {
+    return request('/appointments', { method: 'POST', body: JSON.stringify(payload) });
+  },
   get(id: string): Promise<ApiResponse<Appointment>> {
     return request(`/appointments/${encodeURIComponent(id)}`);
   },
   getToday(): Promise<ApiResponse<Appointment[]>> {
     return request('/appointments/today');
+  },
+  createPaymentIntent(appointmentId: string): Promise<ApiResponse<{
+    client_secret: string;
+    payment_intent_id: string;
+    amount_usd_cents: number;
+    fee_bdt: number;
+    appointment_number: string;
+    doctor_name: string;
+  }>> {
+    return request(`/appointments/${encodeURIComponent(appointmentId)}/payment-intent`, { method: 'POST' });
+  },
+  markPaid(appointmentId: string, payload: { payment_intent_id: string; fee_bdt: number }): Promise<ApiResponse<Appointment>> {
+    return request(`/appointments/${encodeURIComponent(appointmentId)}/mark-paid`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  payDirect(appointmentId: string, payload: {
+    card_number: string;
+    exp_month: number;
+    exp_year: number;
+    cvc: string;
+    card_name?: string;
+  }): Promise<ApiResponse<{ payment_intent_id: string; amount_bdt: number; amount_usd_cents: number }>> {
+    return request(`/appointments/${encodeURIComponent(appointmentId)}/pay-direct`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   },
 };
 
@@ -187,6 +255,32 @@ export const billingAPI = {
   },
   get(id: string): Promise<ApiResponse<Bill>> {
     return request(`/bills/${encodeURIComponent(id)}`);
+  },
+  createPaymentIntent(billId: string): Promise<ApiResponse<{
+    client_secret: string;
+    payment_intent_id: string;
+    amount_usd_cents: number;
+    amount_bdt: number;
+  }>> {
+    return request(`/billing/${encodeURIComponent(billId)}/payment-intent`, { method: 'POST' });
+  },
+  markPaid(billId: string, payload: { payment_intent_id: string; amount_bdt: number }): Promise<ApiResponse<Bill>> {
+    return request(`/billing/${encodeURIComponent(billId)}/mark-paid`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  payDirect(billId: string, payload: {
+    card_number: string;
+    exp_month: number;
+    exp_year: number;
+    cvc: string;
+    card_name?: string;
+  }): Promise<ApiResponse<{ bill: Bill; payment_intent_id: string; amount_bdt: number; amount_usd_cents: number }>> {
+    return request(`/billing/${encodeURIComponent(billId)}/pay-direct`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   },
 };
 
