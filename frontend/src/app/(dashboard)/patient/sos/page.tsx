@@ -1,20 +1,36 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle, LifeBuoy } from 'lucide-react';
 import { PageHeader, SectionCard, KPICard } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { emergencyAPI } from '@/lib/mock-api';
+import { useAuthStore } from '@/lib/auth-store';
 
 export default function PatientSOSPage() {
+  const { user } = useAuthStore();
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [notifiedCount, setNotifiedCount] = useState(0);
+
+  useEffect(() => {
+    // Reset state if user changes or logs out
+    if (!user) {
+      setSent(false);
+    }
+  }, [user]);
 
   async function triggerSOS() {
+    if (!user?.id) {
+      alert('User not authenticated');
+      return;
+    }
+    
     setLoading(true);
     try {
-      await emergencyAPI.triggerSOS();
+      const res = await emergencyAPI.triggerSOS(user.id);
+      setNotifiedCount(res.data.notified_count ?? 0);
       setSent(true);
     } finally {
       setLoading(false);
@@ -41,11 +57,16 @@ export default function PatientSOSPage() {
               {sent ? 'Emergency request sent' : 'Press SOS only for real emergencies'}
             </h2>
             <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
-              This demo calls the mock emergency API. Later, Laravel will connect this flow to ambulance dispatch, ER pre-notification, SMS, and in-app HAS alerts.
+              This will notify the hospital admin, doctors, and nurses immediately, and it also creates the active emergency record for the dispatch team.
             </p>
             <div className="mt-6">
               {sent ? (
-                <Badge variant="healthy" className="px-4 py-2 text-sm">Dispatcher alerted</Badge>
+                <div className="space-y-2">
+                  <Badge variant="healthy" className="px-4 py-2 text-sm">Hospital staff alerted</Badge>
+                  <div className="text-xs text-muted-foreground">
+                    Notified recipients: {notifiedCount}
+                  </div>
+                </div>
               ) : (
                 <Button variant="destructive" size="lg" loading={loading} onClick={triggerSOS}>
                   {!loading && <AlertTriangle className="h-5 w-5" />}

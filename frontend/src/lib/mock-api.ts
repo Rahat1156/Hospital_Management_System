@@ -318,8 +318,14 @@ export const emergencyAPI = {
   listActive(): Promise<ApiResponse<EmergencyRequest[]>> {
     return request('/emergencies/active');
   },
-  triggerSOS(): Promise<ApiResponse<EmergencyRequest>> {
-    return request('/emergencies/trigger-sos', { method: 'POST' });
+  get(id: string): Promise<ApiResponse<EmergencyRequest>> {
+    return request(`/emergencies/${encodeURIComponent(id)}`);
+  },
+  triggerSOS(patientId?: string): Promise<ApiResponse<{ emergency: EmergencyRequest; notified_roles: string[]; notified_count: number }>> {
+    return request('/emergencies/trigger-sos', { 
+      method: 'POST',
+      body: JSON.stringify({ patient_id: patientId }),
+    });
   },
 };
 

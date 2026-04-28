@@ -5,9 +5,8 @@
 
 import type { AuditFields, Gender, PhoneNumber, UUID, VerificationStatus } from './common';
 
-// 8 roles per SRS Section 3.3.1
+// User roles
 export type UserRole =
-  | 'super_admin'       // Platform-level (SaaS operator)
   | 'hospital_admin'    // Tenant-level admin
   | 'doctor'            // Clinical
   | 'nurse'             // Clinical
@@ -67,7 +66,7 @@ export interface PharmacistProfile {
 
 export interface User extends AuditFields {
   id: UUID;
-  tenant_id?: UUID; // null for super_admin
+  tenant_id?: UUID;
   role: UserRole;
   email: string;
   phone: PhoneNumber;

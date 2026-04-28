@@ -53,6 +53,19 @@ export interface EmergencyRequest extends AuditFields {
   patient_mrn?: MRN;
   patient_name: string;
   patient_phone: PhoneNumber;
+  patient?: {
+    id: UUID;
+    user_id?: UUID;
+    mrn?: MRN;
+    full_name?: string;
+    gender?: Gender;
+    date_of_birth?: string;
+    blood_group?: string;
+    phone?: PhoneNumber;
+    email?: string;
+    medical_history?: Record<string, unknown>;
+    address?: Record<string, unknown>;
+  };
   requester_name?: string; // If different from patient
   requester_phone?: PhoneNumber;
   requester_relationship?: string;

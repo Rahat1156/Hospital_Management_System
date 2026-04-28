@@ -837,18 +837,7 @@ class HmsApiController extends Controller
         $rows = $query
             ->orderByDesc('created_at')
             ->get()
-            ->map(fn ($row) => [
-                'id' => $row->id,
-                'alert_id' => $row->alert_id,
-                'user_id' => $row->user_id ? (string) $row->user_id : null,
-                'title' => $row->title,
-                'message' => $row->message,
-                'severity' => $row->severity,
-                'is_read' => (bool) $row->is_read,
-                'read_at' => $this->iso($row->read_at),
-                'action_url' => $row->action_url,
-                'created_at' => $this->iso($row->created_at),
-            ])
+            ->map(fn ($row) => $this->mapNotification($row))
             ->values();
         return $this->ok($rows);
     }
@@ -874,18 +863,7 @@ class HmsApiController extends Controller
 
         $row = DB::table('notifications')->where('id', $id)->first();
 
-        return $this->ok([
-            'id' => $row->id,
-            'alert_id' => $row->alert_id,
-            'user_id' => $row->user_id ? (string) $row->user_id : null,
-            'title' => $row->title,
-            'message' => $row->message,
-            'severity' => $row->severity,
-            'is_read' => (bool) $row->is_read,
-            'read_at' => $this->iso($row->read_at),
-            'action_url' => $row->action_url,
-            'created_at' => $this->iso($row->created_at),
-        ], 'Notification marked as read');
+        return $this->ok($this->mapNotification($row), 'Notification marked as read');
     }
 
     public function acknowledgeAlert(string $id): JsonResponse
@@ -908,27 +886,87 @@ class HmsApiController extends Controller
         return $this->ok($rows);
     }
 
-    public function triggerSos(): JsonResponse
+    public function getEmergency(string $id): JsonResponse
     {
+        $row = DB::table('emergency_requests')->where('id', $id)->first();
+
+        return $row ? $this->ok($this->mapEmergency($row)) : $this->error('Emergency request not found', Response::HTTP_NOT_FOUND);
+    }
+
+    public function triggerSos(Request $request): JsonResponse
+    {
+        // Get patient_id from request or fetch from authenticated user
+        $patientId = $request->input('patient_id');
+        $patient = null;
+        $patientName = 'Unknown';
+        $patientPhone = ['country_code' => '+880', 'number' => '1712345000'];
+        $patientMrn = null;
+
+        // Fetch patient details if provided
+        if ($patientId) {
+            $patient = DB::table('patients')->where('id', $patientId)->first();
+            if ($patient) {
+                $patientName = $patient->full_name ?? 'Unknown';
+                $patientPhone = [
+                    'country_code' => $patient->phone_country_code ?? '+880',
+                    'number' => $patient->phone_number ?? '',
+                ];
+                $patientMrn = $patient->mrn;
+            }
+        }
+
+        $tenantId = DB::table('tenants')->value('id') ?? 'tenant-001';
+        $recipientRoles = ['admin', 'doctor', 'nurse'];
+        $recipients = User::query()
+            ->whereIn('role', $recipientRoles)
+            ->where(function ($query) use ($tenantId) {
+                $query->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
+            })
+            ->get();
+
         $id = 'emr-'.str_pad((string) (DB::table('emergency_requests')->count() + 1), 3, '0', STR_PAD_LEFT);
         $requestNumber = 'EMR-'.now()->format('Y').'-'.str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT);
+        $createdAt = now();
+
         DB::table('emergency_requests')->insert([
             'id' => $id,
-            'tenant_id' => DB::table('tenants')->value('id') ?? 'tenant-001',
+            'tenant_id' => $tenantId,
             'request_number' => $requestNumber,
-            'patient_name' => 'Unknown',
-            'patient_phone_country_code' => '+880',
-            'patient_phone_number' => '1712345000',
+            'patient_id' => $patientId,
+            'patient_name' => $patientName,
+            'patient_phone_country_code' => $patientPhone['country_code'],
+            'patient_phone_number' => $patientPhone['number'],
             'status' => 'sos_received',
-            'priority' => 'high',
-            'pickup_location' => json_encode(['latitude' => 23.8103, 'longitude' => 90.4125, 'address' => 'Dhaka', 'updated_at' => now()->toIso8601String()]),
-            'sos_received_at' => now(),
-            'created_at' => now(),
-            'updated_at' => now(),
+            'priority' => 'critical',
+            'chief_complaint' => 'Emergency SOS - Patient triggered',
+            'pickup_location' => json_encode(['latitude' => 23.8103, 'longitude' => 90.4125, 'address' => 'Patient Location', 'updated_at' => $createdAt->toIso8601String()]),
+            'sos_received_at' => $createdAt,
+            'created_at' => $createdAt,
+            'updated_at' => $createdAt,
         ]);
 
+        foreach ($recipients as $recipient) {
+            DB::table('notifications')->insert([
+                'id' => 'notif-'.Str::uuid(),
+                'alert_id' => null,
+                'user_id' => $recipient->id,
+                'title' => '🚨 Emergency SOS from '.$patientName,
+                'message' => "Patient {$patientName} ({$patientMrn}) triggered SOS emergency - {$requestNumber}. Click to view patient info and emergency details.",
+                'severity' => 'critical',
+                'is_read' => false,
+                'read_at' => null,
+                'action_url' => '/admin/emergency-detail/'.$id,
+                'created_at' => $createdAt,
+                'updated_at' => $createdAt,
+            ]);
+        }
+
         $row = DB::table('emergency_requests')->where('id', $id)->first();
-        return $this->ok($this->mapEmergency($row), 'Emergency dispatcher alerted');
+        return $this->ok([
+            'emergency' => $this->mapEmergency($row),
+            'notified_roles' => $recipientRoles,
+            'notified_count' => $recipients->count(),
+        ], 'Emergency notification sent to hospital staff');
     }
 
     public function listUsers(): JsonResponse
@@ -1298,6 +1336,33 @@ class HmsApiController extends Controller
 
     private function mapEmergency(object $row): array
     {
+        $patient = null;
+        if (! empty($row->patient_id)) {
+            $patientRow = DB::table('patients')
+                ->where('id', $row->patient_id)
+                ->orWhere('user_id', $row->patient_id)
+                ->first();
+
+            if ($patientRow) {
+                $patient = [
+                    'id' => $patientRow->id,
+                    'user_id' => $patientRow->user_id ?? null,
+                    'mrn' => $patientRow->mrn ?? null,
+                    'full_name' => $patientRow->full_name ?? null,
+                    'gender' => $patientRow->gender ?? null,
+                    'date_of_birth' => $this->iso($patientRow->date_of_birth ?? null),
+                    'blood_group' => $patientRow->blood_group ?? null,
+                    'phone' => [
+                        'country_code' => $patientRow->phone_country_code ?? '+880',
+                        'number' => $patientRow->phone_number ?? '',
+                    ],
+                    'email' => $patientRow->email ?? null,
+                    'medical_history' => $this->decodeJson($patientRow->medical_history) ?? new \stdClass(),
+                    'address' => $this->decodeJson($patientRow->address) ?? new \stdClass(),
+                ];
+            }
+        }
+
         return [
             'id' => $row->id,
             'tenant_id' => $row->tenant_id,
@@ -1308,6 +1373,7 @@ class HmsApiController extends Controller
                 'country_code' => $row->patient_phone_country_code ?? '+880',
                 'number' => $row->patient_phone_number ?? '',
             ],
+            'patient' => $patient,
             'requester_name' => $row->requester_name,
             'requester_relationship' => $row->requester_relationship,
             'pickup_location' => $this->decodeJson($row->pickup_location) ?? new \stdClass(),
@@ -1331,6 +1397,50 @@ class HmsApiController extends Controller
             'created_at' => $this->iso($row->created_at),
             'updated_at' => $this->iso($row->updated_at),
         ];
+    }
+
+    private function mapNotification(object $row): array
+    {
+        $notification = [
+            'id' => $row->id,
+            'alert_id' => $row->alert_id,
+            'user_id' => $row->user_id ? (string) $row->user_id : null,
+            'title' => $row->title,
+            'message' => $row->message,
+            'severity' => $row->severity,
+            'is_read' => (bool) $row->is_read,
+            'read_at' => $this->iso($row->read_at),
+            'action_url' => $row->action_url,
+            'created_at' => $this->iso($row->created_at),
+        ];
+
+        if (is_string($row->action_url) && preg_match('#^/admin/emergency-detail/([^/]+)$#', $row->action_url, $matches)) {
+            $emergency = DB::table('emergency_requests as e')
+                ->leftJoin('patients as p', function ($join) {
+                    $join->on('p.id', '=', 'e.patient_id')->orOn('p.user_id', '=', 'e.patient_id');
+                })
+                ->select('e.id as emergency_id', 'e.request_number', 'e.patient_id', 'e.patient_name', 'e.status', 'e.priority', 'p.id as profile_patient_id', 'p.mrn as patient_mrn', 'p.full_name as profile_patient_name', 'p.phone_country_code', 'p.phone_number')
+                ->where('e.id', $matches[1])
+                ->first();
+
+            if ($emergency) {
+                $notification['metadata'] = [
+                    'type' => 'emergency',
+                    'emergency_id' => $emergency->emergency_id,
+                    'request_number' => $emergency->request_number,
+                    'patient_id' => $emergency->patient_id,
+                    'patient_name' => $emergency->profile_patient_name ?: $emergency->patient_name,
+                    'patient_mrn' => $emergency->patient_mrn,
+                    'priority' => $emergency->priority,
+                    'status' => $emergency->status,
+                ];
+
+                $notification['patient_name'] = $emergency->profile_patient_name ?: $emergency->patient_name;
+                $notification['patient_mrn'] = $emergency->patient_mrn;
+            }
+        }
+
+        return $notification;
     }
 
     private function resolvePatientId(string $patientIdOrUserId): string
