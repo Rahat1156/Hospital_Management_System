@@ -389,6 +389,68 @@ class HmsApiController extends Controller
         return $this->ok($rows);
     }
 
+    public function createAppointment(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'patient_id'       => ['required', 'string'],
+            'doctor_id'        => ['required', 'string'],
+            'appointment_type' => ['required', 'string'],
+            'scheduled_at'     => ['required', 'string'],
+            'reason'           => ['required', 'string', 'max:500'],
+            'duration_minutes' => ['nullable', 'integer'],
+        ]);
+
+        $patientId = $this->resolvePatientId($data['patient_id']);
+        $patient   = DB::table('patients')->where('id', $patientId)->first();
+        if (! $patient) {
+            return $this->error('Patient not found', Response::HTTP_NOT_FOUND);
+        }
+
+        $doctor = DB::table('users')->where('id', $data['doctor_id'])->where('role', 'doctor')->first();
+        if (! $doctor) {
+            return $this->error('Doctor not found', Response::HTTP_NOT_FOUND);
+        }
+
+        $profile = is_string($doctor->doctor_profile) ? json_decode($doctor->doctor_profile, true) : [];
+        $feeBdt  = (float) ($profile['consultation_fee_bdt'] ?? 500);
+        $specialty = $profile['specialty'] ?? '';
+
+        $year   = now()->year;
+        $seq    = DB::table('appointments')->count() + 1;
+        $apptNo = 'APT-'.$year.'-'.str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
+
+        $id = (string) \Illuminate\Support\Str::uuid();
+
+        DB::table('appointments')->insert([
+            'id'                  => $id,
+            'tenant_id'           => $patient->tenant_id ?? DB::table('tenants')->value('id'),
+            'appointment_number'  => $apptNo,
+            'patient_id'          => $patientId,
+            'doctor_id'           => (int) $data['doctor_id'],
+            'appointment_type'    => $data['appointment_type'],
+            'status'              => 'scheduled',
+            'source'              => 'online_patient',
+            'scheduled_at'        => $data['scheduled_at'],
+            'duration_minutes'    => $data['duration_minutes'] ?? 30,
+            'reason'              => $data['reason'],
+            'fee_bdt'             => $feeBdt,
+            'payment_status'      => 'pending',
+            'reminder_24h_sent'   => false,
+            'reminder_2h_sent'    => false,
+            'created_at'          => now(),
+            'updated_at'          => now(),
+        ]);
+
+        $row = DB::table('appointments as a')
+            ->leftJoin('patients as p', 'p.id', '=', 'a.patient_id')
+            ->leftJoin('users as d', 'd.id', '=', 'a.doctor_id')
+            ->select('a.*', 'p.mrn as patient_mrn', 'p.full_name as patient_name', 'p.phone_country_code', 'p.phone_number', 'd.full_name as doctor_name', 'd.doctor_profile')
+            ->where('a.id', $id)
+            ->first();
+
+        return $this->ok($this->mapAppointment($row), 'Appointment booked successfully');
+    }
+
     public function listAppointments(Request $request): JsonResponse
     {
         $query = DB::table('appointments as a')
@@ -1065,6 +1127,12 @@ class HmsApiController extends Controller
             'nurse_profile' => $this->decodeJson($arr['nurse_profile'] ?? null),
             'lab_tech_profile' => $this->decodeJson($arr['lab_tech_profile'] ?? null),
             'pharmacist_profile' => $this->decodeJson($arr['pharmacist_profile'] ?? null),
+            'patient_id' => ($arr['role'] ?? '') === 'patient'
+                ? DB::table('patients')->where('user_id', $arr['id'])->value('id')
+                : null,
+            'mrn' => ($arr['role'] ?? '') === 'patient'
+                ? DB::table('patients')->where('user_id', $arr['id'])->value('mrn')
+                : null,
             'created_at' => $this->iso($arr['created_at'] ?? null),
             'updated_at' => $this->iso($arr['updated_at'] ?? null),
         ];
@@ -1077,9 +1145,13 @@ class HmsApiController extends Controller
             'tenant_id' => $row->tenant_id,
             'mrn' => $row->mrn,
             'full_name' => $row->full_name,
+            'father_name' => $row->father_name ?? null,
+            'mother_name' => $row->mother_name ?? null,
             'date_of_birth' => $row->date_of_birth,
             'gender' => $row->gender,
             'marital_status' => $row->marital_status,
+            'religion' => $row->religion ?? null,
+            'occupation' => $row->occupation ?? null,
             'nid_number' => $row->nid_number,
             'birth_certificate_number' => $row->birth_certificate_number,
             'blood_group' => $row->blood_group,
@@ -1457,6 +1529,484 @@ class HmsApiController extends Controller
         if ($channel === 'email') {
             $this->sendOtpEmail($identifier, $code, $purpose, $userId);
         }
+    }
+
+    public function registerWalkIn(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'full_name'                    => ['required', 'string', 'max:255'],
+            'father_name'                  => ['nullable', 'string', 'max:255'],
+            'mother_name'                  => ['nullable', 'string', 'max:255'],
+            'phone_country_code'           => ['required', 'string', 'max:8'],
+            'phone_number'                 => ['required', 'string', 'max:20'],
+            'date_of_birth'                => ['required', 'date'],
+            'gender'                       => ['required', 'in:male,female,other'],
+            'marital_status'               => ['nullable', 'in:single,married,divorced,widowed'],
+            'religion'                     => ['nullable', 'string', 'max:64'],
+            'occupation'                   => ['nullable', 'string', 'max:128'],
+            'nid_number'                   => ['nullable', 'string', 'max:32', 'unique:patients,nid_number'],
+            'birth_certificate_number'     => ['nullable', 'string', 'max:32'],
+            'blood_group'                  => ['nullable', 'string', 'max:5'],
+            'email'                        => ['nullable', 'email', 'max:255'],
+            'address_line1'                => ['nullable', 'string', 'max:255'],
+            'address_city'                 => ['nullable', 'string', 'max:100'],
+            'address_district'             => ['nullable', 'string', 'max:100'],
+            'address_division'             => ['nullable', 'string', 'max:100'],
+            'address_postal_code'          => ['nullable', 'string', 'max:20'],
+            'emergency_contact_name'       => ['nullable', 'string', 'max:255'],
+            'emergency_contact_relation'   => ['nullable', 'string', 'max:64'],
+            'emergency_contact_phone'      => ['nullable', 'string', 'max:20'],
+            'allergies'                    => ['nullable', 'string', 'max:500'],
+            'chronic_conditions'           => ['nullable', 'string', 'max:500'],
+        ]);
+
+        try {
+            $patient = DB::transaction(function () use ($data) {
+                $tenantId = DB::table('tenants')->value('id');
+                if (! $tenantId) {
+                    $tenantId = 'tenant-001';
+                    DB::table('tenants')->insert([
+                        'id'         => $tenantId,
+                        'subdomain'  => 'demo',
+                        'plan'       => 'business',
+                        'status'     => 'active',
+                        'branding'   => json_encode(['hospital_name' => 'Demo Medical Center']),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+
+                $patientId = 'patient-'.str_pad((string) (DB::table('patients')->count() + 1), 3, '0', STR_PAD_LEFT);
+                $mrn = $this->generateMrn();
+
+                $emergencyContacts = [];
+                if (! empty($data['emergency_contact_name'])) {
+                    $emergencyContacts[] = [
+                        'name'         => $data['emergency_contact_name'],
+                        'relationship' => $data['emergency_contact_relation'] ?? '',
+                        'phone'        => [
+                            'country_code' => '+880',
+                            'number'       => $data['emergency_contact_phone'] ?? '',
+                        ],
+                    ];
+                }
+
+                DB::table('patients')->insert([
+                    'id'                       => $patientId,
+                    'tenant_id'                => $tenantId,
+                    'user_id'                  => null,
+                    'mrn'                      => $mrn,
+                    'full_name'                => $data['full_name'],
+                    'father_name'              => $data['father_name'] ?? null,
+                    'mother_name'              => $data['mother_name'] ?? null,
+                    'date_of_birth'            => $data['date_of_birth'],
+                    'gender'                   => $data['gender'],
+                    'marital_status'           => $data['marital_status'] ?? null,
+                    'religion'                 => $data['religion'] ?? null,
+                    'occupation'               => $data['occupation'] ?? null,
+                    'nid_number'               => $data['nid_number'] ?? null,
+                    'birth_certificate_number' => $data['birth_certificate_number'] ?? null,
+                    'blood_group'              => $data['blood_group'] ?? null,
+                    'phone_country_code'       => $data['phone_country_code'],
+                    'phone_number'             => $data['phone_number'],
+                    'email'                    => $data['email'] ?? null,
+                    'address'                  => json_encode([
+                        'line1'       => $data['address_line1'] ?? '',
+                        'city'        => $data['address_city'] ?? '',
+                        'district'    => $data['address_district'] ?? '',
+                        'division'    => $data['address_division'] ?? '',
+                        'postal_code' => $data['address_postal_code'] ?? '',
+                        'country'     => 'Bangladesh',
+                    ]),
+                    'emergency_contacts'       => json_encode($emergencyContacts),
+                    'medical_history'          => json_encode([
+                        'allergies'           => array_filter(array_map('trim', explode(',', $data['allergies'] ?? ''))),
+                        'chronic_conditions'  => array_filter(array_map('trim', explode(',', $data['chronic_conditions'] ?? ''))),
+                        'current_medications' => [],
+                        'past_surgeries'      => [],
+                        'family_history'      => [],
+                    ]),
+                    'patient_type'             => 'walk_in',
+                    'total_visits'             => 0,
+                    'outstanding_balance_bdt'  => 0,
+                    'created_at'               => now(),
+                    'updated_at'               => now(),
+                ]);
+
+                return DB::table('patients')->where('id', $patientId)->first();
+            });
+        } catch (\Throwable $e) {
+            Log::error('Walk-in patient registration failed', ['error' => $e->getMessage()]);
+            return $this->error('Failed to register patient. Please try again.', Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        return $this->ok($this->mapPatient($patient), 'Patient registered successfully');
+    }
+
+    public function appointmentPayDirect(Request $request, string $id): JsonResponse
+    {
+        $data = $request->validate([
+            'card_number' => ['required', 'string'],
+            'exp_month'   => ['nullable', 'integer'],
+            'exp_year'    => ['nullable', 'integer'],
+            'cvc'         => ['nullable', 'string'],
+            'card_name'   => ['nullable', 'string', 'max:128'],
+        ]);
+
+        $appointment = DB::table('appointments')->where('id', $id)->first();
+        if (! $appointment) {
+            return $this->error('Appointment not found', Response::HTTP_NOT_FOUND);
+        }
+        if ($appointment->payment_status === 'paid') {
+            return $this->error('This appointment fee has already been paid.', Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $feeBdt      = (float) $appointment->fee_bdt;
+        $amountCents = max(50, (int) round(($feeBdt / 110) * 100));
+        $stripeKey   = config('services.stripe.secret');
+
+        if (! $stripeKey) {
+            return $this->error('Stripe is not configured on this server.', Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+
+        try {
+            \Stripe\Stripe::setApiKey($stripeKey);
+
+            // Map test card numbers to Stripe's built-in test payment method tokens.
+            // This avoids the raw card data API restriction while still creating
+            // real transactions visible in the Stripe sandbox dashboard.
+            $testTokenMap = [
+                '4242424242424242' => 'pm_card_visa',
+                '5555555555554444' => 'pm_card_mastercard',
+                '4000056655665556' => 'pm_card_visa_debit',
+                '4000000000000002' => 'pm_card_chargeDeclined',
+            ];
+            $rawNumber = preg_replace('/\s+/', '', $data['card_number']);
+            $pmToken   = $testTokenMap[$rawNumber] ?? 'pm_card_visa';
+
+            $intent = \Stripe\PaymentIntent::create([
+                'amount'               => $amountCents,
+                'currency'             => 'usd',
+                'payment_method'       => $pmToken,
+                'payment_method_types' => ['card'],
+                'confirm'              => true,
+                'description'          => "Appointment {$appointment->appointment_number} — Patient",
+                'metadata'             => [
+                    'appointment_id'     => (string) $id,
+                    'appointment_number' => (string) $appointment->appointment_number,
+                    'fee_bdt'            => (string) $feeBdt,
+                ],
+            ]);
+
+            if ($intent->status !== 'succeeded') {
+                return $this->error('Payment was not completed. Status: '.$intent->status, Response::HTTP_PAYMENT_REQUIRED);
+            }
+
+            DB::table('appointments')->where('id', $id)->update([
+                'payment_status' => 'paid',
+                'notes'          => trim(($appointment->notes ?? '').' | Stripe: '.$intent->id),
+                'updated_at'     => now(),
+            ]);
+
+            return $this->ok([
+                'payment_intent_id' => $intent->id,
+                'amount_bdt'        => $feeBdt,
+                'amount_usd_cents'  => $amountCents,
+            ], 'Payment successful');
+        } catch (\Stripe\Exception\CardException $e) {
+            return $this->error('Card declined: '.$e->getMessage(), Response::HTTP_PAYMENT_REQUIRED);
+        } catch (\Throwable $e) {
+            Log::error('Appointment direct pay failed', ['id' => $id, 'error' => $e->getMessage()]);
+            return $this->error('Payment failed: '.$e->getMessage(), Response::HTTP_BAD_GATEWAY);
+        }
+    }
+
+    public function billPayDirect(Request $request, string $id): JsonResponse
+    {
+        $data = $request->validate([
+            'card_number' => ['required', 'string'],
+            'exp_month'   => ['nullable', 'integer'],
+            'exp_year'    => ['nullable', 'integer'],
+            'cvc'         => ['nullable', 'string'],
+            'card_name'   => ['nullable', 'string', 'max:128'],
+        ]);
+
+        $bill = DB::table('bills')->where('id', $id)->first();
+        if (! $bill) {
+            return $this->error('Bill not found', Response::HTTP_NOT_FOUND);
+        }
+
+        $outstanding = (float) $bill->amount_outstanding_bdt;
+        if ($outstanding <= 0) {
+            return $this->error('This bill has no outstanding balance.', Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $amountCents = max(50, (int) round(($outstanding / 110) * 100));
+        $stripeKey   = config('services.stripe.secret');
+
+        if (! $stripeKey) {
+            return $this->error('Stripe is not configured on this server.', Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+
+        try {
+            \Stripe\Stripe::setApiKey($stripeKey);
+
+            $testTokenMap = [
+                '4242424242424242' => 'pm_card_visa',
+                '5555555555554444' => 'pm_card_mastercard',
+                '4000056655665556' => 'pm_card_visa_debit',
+                '4000000000000002' => 'pm_card_chargeDeclined',
+            ];
+            $rawNumber = preg_replace('/\s+/', '', $data['card_number']);
+            $pmToken   = $testTokenMap[$rawNumber] ?? 'pm_card_visa';
+
+            $intent = \Stripe\PaymentIntent::create([
+                'amount'               => $amountCents,
+                'currency'             => 'usd',
+                'payment_method'       => $pmToken,
+                'payment_method_types' => ['card'],
+                'confirm'              => true,
+                'description'          => "Bill {$bill->bill_number}",
+                'metadata'             => ['bill_id' => (string) $id, 'amount_bdt' => (string) $outstanding],
+            ]);
+
+            if ($intent->status !== 'succeeded') {
+                return $this->error('Payment was not completed. Status: '.$intent->status, Response::HTTP_PAYMENT_REQUIRED);
+            }
+
+            $existing   = $this->decodeJson($bill->payments) ?? [];
+            $existing[] = [
+                'id'                => 'pay-'.Str::uuid(),
+                'bill_id'           => $id,
+                'amount_bdt'        => $outstanding,
+                'method'            => 'stripe_card',
+                'transaction_id'    => $intent->id,
+                'gateway_reference' => $intent->id,
+                'status'            => 'success',
+                'paid_at'           => now()->toIso8601String(),
+                'notes'             => 'Stripe sandbox direct charge',
+            ];
+
+            $newPaid        = (float) $bill->amount_paid_bdt + $outstanding;
+            $newOutstanding = max(0.0, (float) $bill->total_amount_bdt - $newPaid);
+
+            DB::table('bills')->where('id', $id)->update([
+                'amount_paid_bdt'        => $newPaid,
+                'amount_outstanding_bdt' => $newOutstanding,
+                'status'                 => $newOutstanding <= 0 ? 'paid' : 'partial',
+                'payments'               => json_encode($existing),
+                'updated_at'             => now(),
+            ]);
+
+            $row = DB::table('bills as b')
+                ->leftJoin('patients as p', 'p.id', '=', 'b.patient_id')
+                ->select('b.*', 'p.mrn as patient_mrn', 'p.full_name as patient_name', 'p.phone_country_code', 'p.phone_number')
+                ->where('b.id', $id)->first();
+
+            return $this->ok([
+                'bill'              => $this->mapBill($row),
+                'payment_intent_id' => $intent->id,
+                'amount_bdt'        => $outstanding,
+                'amount_usd_cents'  => $amountCents,
+            ], 'Payment successful');
+        } catch (\Stripe\Exception\CardException $e) {
+            return $this->error('Card declined: '.$e->getMessage(), Response::HTTP_PAYMENT_REQUIRED);
+        } catch (\Throwable $e) {
+            Log::error('Bill direct pay failed', ['id' => $id, 'error' => $e->getMessage()]);
+            return $this->error('Payment failed: '.$e->getMessage(), Response::HTTP_BAD_GATEWAY);
+        }
+    }
+
+    public function appointmentPaymentIntent(string $id): JsonResponse
+    {
+        $row = DB::table('appointments as a')
+            ->leftJoin('users as u', 'u.id', '=', 'a.doctor_id')
+            ->select('a.*', 'u.full_name as doctor_full_name')
+            ->where('a.id', $id)
+            ->first();
+
+        if (! $row) {
+            return $this->error('Appointment not found', Response::HTTP_NOT_FOUND);
+        }
+
+        if ($row->payment_status === 'paid') {
+            return $this->error('This appointment fee has already been paid.', Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $feeBdt = (float) $row->fee_bdt;
+        if ($feeBdt <= 0) {
+            return $this->error('This appointment has no fee to collect.', Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $stripeKey = config('services.stripe.secret');
+        if (! $stripeKey) {
+            return $this->error('Stripe is not configured on this server.', Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+
+        try {
+            \Stripe\Stripe::setApiKey($stripeKey);
+
+            $amountCents = max(50, (int) round(($feeBdt / 110) * 100));
+
+            $intent = \Stripe\PaymentIntent::create([
+                'amount'      => $amountCents,
+                'currency'    => 'usd',
+                'description' => "Appointment {$row->appointment_number} — {$row->doctor_full_name}",
+                'metadata'    => [
+                    'appointment_id'     => (string) $row->id,
+                    'appointment_number' => (string) $row->appointment_number,
+                    'patient_name'       => (string) $row->patient_name,
+                    'doctor_name'        => (string) $row->doctor_full_name,
+                    'fee_bdt'            => (string) $feeBdt,
+                ],
+            ]);
+
+            return $this->ok([
+                'client_secret'      => $intent->client_secret,
+                'payment_intent_id'  => $intent->id,
+                'amount_usd_cents'   => $amountCents,
+                'fee_bdt'            => $feeBdt,
+                'appointment_number' => $row->appointment_number,
+                'doctor_name'        => $row->doctor_full_name,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Stripe appointment PaymentIntent failed', ['appointment_id' => $id, 'error' => $e->getMessage()]);
+            return $this->error('Payment gateway error: '.$e->getMessage(), Response::HTTP_BAD_GATEWAY);
+        }
+    }
+
+    public function markAppointmentPaid(Request $request, string $id): JsonResponse
+    {
+        $data = $request->validate([
+            'payment_intent_id' => ['required', 'string'],
+            'fee_bdt'           => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $appointment = DB::table('appointments')->where('id', $id)->first();
+        if (! $appointment) {
+            return $this->error('Appointment not found', Response::HTTP_NOT_FOUND);
+        }
+
+        DB::table('appointments')->where('id', $id)->update([
+            'payment_status' => 'paid',
+            'notes'          => trim(($appointment->notes ?? '').' | Stripe: '.$data['payment_intent_id']),
+            'updated_at'     => now(),
+        ]);
+
+        $row = DB::table('appointments as a')
+            ->leftJoin('patients as p', 'p.id', '=', 'a.patient_id')
+            ->leftJoin('users as u', 'u.id', '=', 'a.doctor_id')
+            ->select(
+                'a.*',
+                'p.mrn as patient_mrn_col',
+                'p.full_name as patient_full_name',
+                'p.phone_country_code',
+                'p.phone_number',
+                'u.full_name as doctor_full_name',
+                'u.doctor_profile'
+            )
+            ->where('a.id', $id)
+            ->first();
+
+        return $this->ok($this->mapAppointment($row), 'Payment recorded successfully');
+    }
+
+    public function createPaymentIntent(string $id): JsonResponse
+    {
+        $row = DB::table('bills as b')
+            ->leftJoin('patients as p', 'p.id', '=', 'b.patient_id')
+            ->select('b.*', 'p.full_name as patient_name', 'p.mrn as patient_mrn')
+            ->where('b.id', $id)
+            ->first();
+
+        if (! $row) {
+            return $this->error('Bill not found', Response::HTTP_NOT_FOUND);
+        }
+
+        $outstanding = (float) $row->amount_outstanding_bdt;
+        if ($outstanding <= 0) {
+            return $this->error('This bill has no outstanding balance.', Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $stripeKey = config('services.stripe.secret');
+        if (! $stripeKey) {
+            return $this->error('Stripe is not configured on this server.', Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+
+        try {
+            \Stripe\Stripe::setApiKey($stripeKey);
+
+            // Stripe does not support BDT; charge in USD (1 USD ≈ 110 BDT, min 50 cents)
+            $amountCents = max(50, (int) round(($outstanding / 110) * 100));
+
+            $intent = \Stripe\PaymentIntent::create([
+                'amount'      => $amountCents,
+                'currency'    => 'usd',
+                'description' => "Bill {$row->bill_number} — Patient",
+                'metadata'    => [
+                    'bill_id'     => (string) $row->id,
+                    'bill_number' => (string) $row->bill_number,
+                    'patient_mrn' => (string) $row->patient_mrn,
+                    'amount_bdt'  => (string) $outstanding,
+                ],
+            ]);
+
+            return $this->ok([
+                'client_secret'      => $intent->client_secret,
+                'payment_intent_id'  => $intent->id,
+                'amount_usd_cents'   => $amountCents,
+                'amount_bdt'         => $outstanding,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Stripe PaymentIntent creation failed', ['bill_id' => $id, 'error' => $e->getMessage()]);
+            return $this->error('Payment gateway error: '.$e->getMessage(), Response::HTTP_BAD_GATEWAY);
+        }
+    }
+
+    public function markBillPaid(Request $request, string $id): JsonResponse
+    {
+        $data = $request->validate([
+            'payment_intent_id' => ['required', 'string'],
+            'amount_bdt'        => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $bill = DB::table('bills')->where('id', $id)->first();
+        if (! $bill) {
+            return $this->error('Bill not found', Response::HTTP_NOT_FOUND);
+        }
+
+        $existing  = $this->decodeJson($bill->payments) ?? [];
+        $existing[] = [
+            'id'                => 'pay-'.Str::uuid(),
+            'bill_id'           => $id,
+            'amount_bdt'        => (float) $data['amount_bdt'],
+            'method'            => 'stripe_card',
+            'transaction_id'    => $data['payment_intent_id'],
+            'gateway_reference' => $data['payment_intent_id'],
+            'status'            => 'success',
+            'paid_at'           => now()->toIso8601String(),
+            'notes'             => 'Stripe sandbox payment',
+        ];
+
+        $newPaid        = (float) $bill->amount_paid_bdt + (float) $data['amount_bdt'];
+        $newOutstanding = max(0.0, (float) $bill->total_amount_bdt - $newPaid);
+        $newStatus      = $newOutstanding <= 0 ? 'paid' : 'partial';
+
+        DB::table('bills')->where('id', $id)->update([
+            'amount_paid_bdt'        => $newPaid,
+            'amount_outstanding_bdt' => $newOutstanding,
+            'status'                 => $newStatus,
+            'payments'               => json_encode($existing),
+            'updated_at'             => now(),
+        ]);
+
+        $row = DB::table('bills as b')
+            ->leftJoin('patients as p', 'p.id', '=', 'b.patient_id')
+            ->select('b.*', 'p.mrn as patient_mrn', 'p.full_name as patient_name', 'p.phone_country_code', 'p.phone_number')
+            ->where('b.id', $id)
+            ->first();
+
+        return $this->ok($this->mapBill($row), 'Payment recorded successfully');
     }
 
     private function sendOtpEmail(string $email, string $otpCode, string $purpose, ?string $userId = null): void

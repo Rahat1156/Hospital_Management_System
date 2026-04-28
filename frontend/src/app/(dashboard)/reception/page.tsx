@@ -46,7 +46,7 @@ export default function ReceptionDashboardPage() {
         actions={
           <div className="flex gap-2">
             <Button asChild variant="outline" size="sm">
-              <Link href="/reception/register">
+              <Link href="/reception/register-patient">
                 <UserPlus className="h-4 w-4" /> Register Patient
               </Link>
             </Button>

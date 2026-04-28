@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { DollarSign, FileText, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { CreditCard, Download, FileText, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { PageHeader, SectionCard, EmptyState, KPICard } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { StripePayModal } from '@/components/stripe/pay-modal';
 import { billingAPI } from '@/lib/mock-api';
+import { downloadReceipt } from '@/lib/receipt-utils';
 import { formatBDT, formatDate } from '@/lib/utils';
 import type { Bill, BillStatus } from '@/types';
 
@@ -15,10 +17,15 @@ export default function BillingPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | BillStatus>('all');
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [payingBill, setPayingBill] = useState<Bill | null>(null);
 
   useEffect(() => {
     billingAPI.list().then((r) => setBills(r.data));
   }, []);
+
+  function handlePaid(updatedBill: Bill) {
+    setBills(prev => prev.map(b => b.id === updatedBill.id ? updatedBill : b));
+  }
 
   const filtered = bills.filter((b) => {
     const q = search.toLowerCase();
@@ -48,18 +55,21 @@ export default function BillingPage() {
     <div className="space-y-6">
       <PageHeader
         title="Billing & Finance"
-        description="Invoice management and payment tracking"
+        description="Invoice management and Stripe payment collection"
         actions={
-          <Button variant="outline" size="sm">
-            Export
+          <Button variant="outline" size="sm" onClick={() => {
+            const paid = bills.filter(b => b.status === 'paid');
+            if (paid.length > 0) downloadReceipt(paid[0]);
+          }}>
+            Export Latest Receipt
           </Button>
         }
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KPICard label="Total Collected" value={formatBDT(totalRevenue)} icon={DollarSign} accentColor="healthy" />
+        <KPICard label="Total Collected" value={formatBDT(totalRevenue)} icon={CreditCard} accentColor="healthy" />
         <KPICard label="Outstanding" value={formatBDT(totalOutstanding)} icon={FileText} accentColor="critical" />
-        <KPICard label="Paid Invoices" value={paidCount} icon={DollarSign} accentColor="accent" />
+        <KPICard label="Paid Invoices" value={paidCount} icon={CreditCard} accentColor="accent" />
         <KPICard label="Pending / Partial" value={pendingCount} icon={FileText} accentColor="borderline" />
       </div>
 
@@ -90,10 +100,7 @@ export default function BillingPage() {
         ))}
       </div>
 
-      <SectionCard
-        title="Invoices"
-        description={`Showing ${filtered.length} of ${bills.length}`}
-      >
+      <SectionCard title="Invoices" description={`Showing ${filtered.length} of ${bills.length}`}>
         {filtered.length === 0 ? (
           <div className="p-6">
             <EmptyState icon={FileText} title="No invoices found" description="Try adjusting your search or filter." />
@@ -218,6 +225,31 @@ export default function BillingPage() {
                         Discount note: {bill.discount_reason}
                       </div>
                     )}
+
+                    {/* Action buttons */}
+                    <div className="mt-4 flex flex-wrap gap-3 border-t border-border pt-4">
+                      {(bill.status === 'pending' || bill.status === 'partial') && (
+                        <Button
+                          size="sm"
+                          className="gap-2"
+                          onClick={(e) => { e.stopPropagation(); setPayingBill(bill); }}
+                        >
+                          <CreditCard className="h-4 w-4" />
+                          Pay via Stripe
+                        </Button>
+                      )}
+                      {(bill.status === 'paid' || bill.status === 'partial') && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-2"
+                          onClick={(e) => { e.stopPropagation(); downloadReceipt(bill); }}
+                        >
+                          <Download className="h-4 w-4" />
+                          Download Receipt
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -225,6 +257,14 @@ export default function BillingPage() {
           </div>
         )}
       </SectionCard>
+
+      {payingBill && (
+        <StripePayModal
+          bill={payingBill}
+          onClose={() => setPayingBill(null)}
+          onPaid={(updated) => { handlePaid(updated); setPayingBill(null); }}
+        />
+      )}
     </div>
   );
 }

@@ -90,6 +90,9 @@ export interface User extends AuditFields {
   nurse_profile?: NurseProfile;
   lab_tech_profile?: LabTechProfile;
   pharmacist_profile?: PharmacistProfile;
+  // Populated for patient role only
+  patient_id?: string;
+  mrn?: string;
 }
 
 // Auth-related types
