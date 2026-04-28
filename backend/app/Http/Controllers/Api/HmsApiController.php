@@ -389,68 +389,6 @@ class HmsApiController extends Controller
         return $this->ok($rows);
     }
 
-    public function createAppointment(Request $request): JsonResponse
-    {
-        $data = $request->validate([
-            'patient_id'       => ['required', 'string'],
-            'doctor_id'        => ['required', 'string'],
-            'appointment_type' => ['required', 'string'],
-            'scheduled_at'     => ['required', 'string'],
-            'reason'           => ['required', 'string', 'max:500'],
-            'duration_minutes' => ['nullable', 'integer'],
-        ]);
-
-        $patientId = $this->resolvePatientId($data['patient_id']);
-        $patient   = DB::table('patients')->where('id', $patientId)->first();
-        if (! $patient) {
-            return $this->error('Patient not found', Response::HTTP_NOT_FOUND);
-        }
-
-        $doctor = DB::table('users')->where('id', $data['doctor_id'])->where('role', 'doctor')->first();
-        if (! $doctor) {
-            return $this->error('Doctor not found', Response::HTTP_NOT_FOUND);
-        }
-
-        $profile = is_string($doctor->doctor_profile) ? json_decode($doctor->doctor_profile, true) : [];
-        $feeBdt  = (float) ($profile['consultation_fee_bdt'] ?? 500);
-        $specialty = $profile['specialty'] ?? '';
-
-        $year   = now()->year;
-        $seq    = DB::table('appointments')->count() + 1;
-        $apptNo = 'APT-'.$year.'-'.str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
-
-        $id = (string) \Illuminate\Support\Str::uuid();
-
-        DB::table('appointments')->insert([
-            'id'                  => $id,
-            'tenant_id'           => $patient->tenant_id ?? DB::table('tenants')->value('id'),
-            'appointment_number'  => $apptNo,
-            'patient_id'          => $patientId,
-            'doctor_id'           => (int) $data['doctor_id'],
-            'appointment_type'    => $data['appointment_type'],
-            'status'              => 'scheduled',
-            'source'              => 'online_patient',
-            'scheduled_at'        => $data['scheduled_at'],
-            'duration_minutes'    => $data['duration_minutes'] ?? 30,
-            'reason'              => $data['reason'],
-            'fee_bdt'             => $feeBdt,
-            'payment_status'      => 'pending',
-            'reminder_24h_sent'   => false,
-            'reminder_2h_sent'    => false,
-            'created_at'          => now(),
-            'updated_at'          => now(),
-        ]);
-
-        $row = DB::table('appointments as a')
-            ->leftJoin('patients as p', 'p.id', '=', 'a.patient_id')
-            ->leftJoin('users as d', 'd.id', '=', 'a.doctor_id')
-            ->select('a.*', 'p.mrn as patient_mrn', 'p.full_name as patient_name', 'p.phone_country_code', 'p.phone_number', 'd.full_name as doctor_name', 'd.doctor_profile')
-            ->where('a.id', $id)
-            ->first();
-
-        return $this->ok($this->mapAppointment($row), 'Appointment booked successfully');
-    }
-
     public function listAppointments(Request $request): JsonResponse
     {
         $query = DB::table('appointments as a')
