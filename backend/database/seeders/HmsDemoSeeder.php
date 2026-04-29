@@ -111,7 +111,7 @@ class HmsDemoSeeder extends Seeder
             [
                 'role' => 'lab_technician',
                 'email' => 'lab.tanvir@demo.hms.com.bd',
-                'full_name' => 'Tanvir Islam',
+                'full_name' => 'Tanvir Islaam',
                 'phone_number' => '1712345005',
                 'gender' => 'male',
                 'lab_tech_profile' => ['license_number' => 'LAB-2019-8765', 'specializations' => ['Hematology', 'Biochemistry']],

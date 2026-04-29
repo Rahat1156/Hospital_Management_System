@@ -281,6 +281,11 @@ export function Topbar({ onMobileMenuOpen }: TopbarProps) {
                             {n.severity}
                           </Badge>
                         </div>
+                        {n.metadata?.type === 'emergency' && (
+                          <div className="mt-0.5 text-[11px] font-medium text-critical">
+                            Emergency SOS{n.patient_name ? ` · ${n.patient_name}` : ''}{n.patient_mrn ? ` (${n.patient_mrn})` : ''}
+                          </div>
+                        )}
                         <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{n.message}</div>
                         <div className="mt-1 text-[10px] text-muted-foreground">
                           {formatRelative(n.created_at)}

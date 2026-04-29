@@ -69,6 +69,7 @@ Route::post('/alerts/notifications/{id}/read', [HmsApiController::class, 'markNo
 Route::post('/alerts/{id}/acknowledge', [HmsApiController::class, 'acknowledgeAlert']);
 
 Route::get('/emergencies/active', [HmsApiController::class, 'activeEmergencies']);
+Route::get('/emergencies/{id}', [HmsApiController::class, 'getEmergency']);
 Route::post('/emergencies/trigger-sos', [HmsApiController::class, 'triggerSos']);
 
 Route::get('/users', [HmsApiController::class, 'listUsers']);

@@ -243,22 +243,6 @@ export const MOCK_USERS: User[] = [
     created_at: '2026-02-15T00:00:00Z',
     updated_at: '2026-04-22T00:00:00Z',
   },
-  {
-    id: 'user-super-001',
-    role: 'super_admin',
-    email: 'super@hms.com.bd',
-    phone: { country_code: '+880', number: '1712345000' },
-    full_name: 'Platform Super Admin',
-    profile_photo_url: 'https://api.dicebear.com/9.x/initials/svg?seed=PA&backgroundColor=0b4f6c',
-    gender: 'male',
-    status: 'active',
-    email_verified: true,
-    phone_verified: true,
-    two_factor_enabled: true,
-    failed_login_attempts: 0,
-    created_at: '2026-01-01T00:00:00Z',
-    updated_at: '2026-04-22T00:00:00Z',
-  },
 ];
 
 // Demo credentials for login
@@ -271,7 +255,6 @@ export const DEMO_CREDENTIALS = [
   { role: 'Pharmacist', email: 'pharm.sadia@demo.hms.com.bd', password: 'Demo@2026' },
   { role: 'Receptionist', email: 'reception@demo.hms.com.bd', password: 'Demo@2026' },
   { role: 'Patient', email: 'rahim.patient@gmail.com', password: 'Demo@2026' },
-  { role: 'Super Admin', email: 'super@hms.com.bd', password: 'Demo@2026' },
 ];
 
 // ============================================================================

@@ -114,20 +114,9 @@ export const navigationByRole: Record<UserRole, NavGroup[]> = {
       ],
     },
   ],
-  super_admin: [
-    {
-      items: [
-        { label: 'Platform Overview', href: '/super-admin', icon: LayoutDashboard },
-        { label: 'Tenants', href: '/super-admin/tenants', icon: Building2 },
-        { label: 'Subscriptions', href: '/super-admin/subscriptions', icon: CreditCard },
-        { label: 'Platform Alerts', href: '/super-admin/platform-alerts', icon: AlertTriangle },
-      ],
-    },
-  ],
 };
 
 export const roleLabels: Record<UserRole, string> = {
-  super_admin: 'Platform Admin',
   hospital_admin: 'Hospital Admin',
   doctor: 'Doctor',
   nurse: 'Nurse',
@@ -138,7 +127,6 @@ export const roleLabels: Record<UserRole, string> = {
 };
 
 export const roleIcons: Record<UserRole, typeof LayoutDashboard> = {
-  super_admin: Settings,
   hospital_admin: Building2,
   doctor: Stethoscope,
   nurse: HeartPulse,

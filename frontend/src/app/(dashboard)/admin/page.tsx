@@ -3,27 +3,29 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  Activity, AlertTriangle, Bed, Calendar, DollarSign, FlaskConical, TrendingUp, Users,
+  Activity, AlertTriangle, Bed, Calendar, DollarSign, FlaskConical, TrendingUp, Users, Phone, MapPin,
 } from 'lucide-react';
 import { PageHeader, KPICard, SectionCard } from '@/components/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/avatar';
-import { alertAPI, appointmentAPI, dashboardAPI } from '@/lib/mock-api';
+import { alertAPI, appointmentAPI, dashboardAPI, emergencyAPI } from '@/lib/mock-api';
 import { formatBDT, formatRelative, formatTime, cn } from '@/lib/utils';
-import type { Alert, Appointment, ChartDataPoint, DashboardKPIs } from '@/types';
+import type { Alert, Appointment, ChartDataPoint, DashboardKPIs, EmergencyRequest } from '@/types';
 
 export default function AdminDashboardPage() {
   const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
   const [revenueTrend, setRevenueTrend] = useState<ChartDataPoint[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [emergencies, setEmergencies] = useState<EmergencyRequest[]>([]);
 
   useEffect(() => {
     dashboardAPI.getKPIs().then((r) => setKpis(r.data));
     dashboardAPI.getRevenueTrend().then((r) => setRevenueTrend(r.data));
     alertAPI.getActive().then((r) => setAlerts(r.data));
     appointmentAPI.getToday().then((r) => setAppointments(r.data));
+    emergencyAPI.listActive().then((r) => setEmergencies(r.data));
   }, []);
 
   const maxRevenue = Math.max(...revenueTrend.map((d) => d.value), 1);
@@ -92,6 +94,74 @@ export default function AdminDashboardPage() {
             <Link href="/admin/alerts">Review now</Link>
           </Button>
         </div>
+      )}
+
+      {/* Active SOS Emergencies */}
+      {emergencies.length > 0 && (
+        <SectionCard
+          title={`🚨 Active SOS Emergencies (${emergencies.length})`}
+          description="Immediate medical emergencies requiring urgent response"
+          className="border-2 border-critical/40 bg-critical/5"
+          action={
+            <Button asChild variant="destructive" size="sm">
+              <Link href="/admin/emergency">Manage all</Link>
+            </Button>
+          }
+        >
+          <div className="divide-y divide-critical/20">
+            {emergencies.map((em) => (
+              <div
+                key={em.id}
+                className="flex items-start gap-4 p-4 hover:bg-critical/10 transition-colors border-l-4 border-critical"
+              >
+                <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-critical/20">
+                  <AlertTriangle className="h-5 w-5 text-critical" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-semibold text-foreground">
+                        {em.patient_name}
+                        {em.patient_mrn && <span className="ml-2 font-mono text-xs text-muted-foreground">{em.patient_mrn}</span>}
+                      </div>
+                      <div className="mt-1 flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Phone className="h-3.5 w-3.5" />
+                          {em.patient_phone?.country_code}{em.patient_phone?.number}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-3.5 w-3.5" />
+                          {em.pickup_location?.address || 'Location pending'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <Badge variant={em.priority === 'critical' ? 'critical' : 'warning'} className="mb-1">
+                        {em.priority.toUpperCase()}
+                      </Badge>
+                      <div className="text-xs text-muted-foreground">{em.request_number}</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <div
+                      className={cn(
+                        'h-2 w-2 rounded-full animate-pulse',
+                        em.status === 'sos_received' && 'bg-critical',
+                        em.status === 'dispatcher_assigned' && 'bg-orange-500',
+                        em.status === 'ambulance_assigned' && 'bg-orange-500',
+                        em.status === 'en_route_to_patient' && 'bg-blue-500',
+                      )}
+                    />
+                    <span className="text-xs font-medium capitalize">{em.status.replace(/_/g, ' ')}</span>
+                    {em.sos_received_at && (
+                      <span className="text-xs text-muted-foreground">• {formatRelative(em.sos_received_at)}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
       )}
 
       {/* Charts + Alerts */}

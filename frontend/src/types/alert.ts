@@ -127,5 +127,8 @@ export interface InAppNotification {
   is_read: boolean;
   read_at?: string;
   action_url?: string;
+  patient_name?: string;
+  patient_mrn?: string;
+  metadata?: Record<string, string | number | boolean | null>;
   created_at: string;
 }

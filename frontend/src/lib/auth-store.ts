@@ -68,7 +68,6 @@ export const useAuthStore = create<AuthState>()(
 
 export function roleDashboardPath(role: UserRole): string {
   const routes: Record<UserRole, string> = {
-    super_admin: '/super-admin',
     hospital_admin: '/admin',
     doctor: '/doctor',
     nurse: '/nurse',
